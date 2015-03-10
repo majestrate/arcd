@@ -7,7 +7,7 @@ import (
 const BLOOM_FILTER_BITS = 20
 
 type DecayingBloomFilter struct {
-  array []byte
+  array map[uint64]bool
   bins, probes uint
 }
 
@@ -18,17 +18,17 @@ func (self *DecayingBloomFilter) Init() {
 
 func (self *DecayingBloomFilter) Decay() {
   self.array = nil
-  self.array = make([]byte, 1024 * 8)
+  self.array = make(map[uint64] bool)
 }
 
 func (self *DecayingBloomFilter) Add(data []byte) {
-  idx := SHA1AsUInt64(data) % uint64(len(self.array))
-  self.array[idx] = 1
+  idx := SHA1AsUInt64(data) 
+  self.array[idx] = true
 }
 
 func (self *DecayingBloomFilter) Contains(data []byte) bool {
-  idx := SHA1AsUInt64(data) % uint64(len(self.array))
-  return self.array[idx] == 1
+  idx := SHA1AsUInt64(data) 
+  return self.array[idx] 
   /*
   probes := self.get_probes(data)
   for idx := range(probes) {
