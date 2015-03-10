@@ -158,7 +158,6 @@ func (self *HubHandler) ReadMessages() {
       log.Println("filter hit")
       continue
     }
-    self.daemon.Filter.Add(buff)
     log.Println("Got Message of size", msg.MessageLength)
     
     if msg.MessageType == ARC_MESG_TYPE_DHT {
@@ -191,10 +190,6 @@ func (self *HubHandler) WriteMessages() {
     msg := <- self.Broadacst 
     log.Println("hub write message")
     buff := msg.Bytes()
-    if self.daemon.Filter.Contains(buff) {
-      continue
-    }
-    self.daemon.Filter.Add(buff)
     _, err := self.conn.Write(buff)
     if err != nil {
       log.Println("Failed to write message", err)
@@ -221,6 +216,8 @@ func (self *Daemon) SendTo(target []byte, msg *ARCMessage) {
 
 func (self *Daemon) got_Broadcast(msg *ARCMessage, ircd *IRCD) {
   ircd.Broadcast <- string(msg.MessageData)
+  buff := msg.Bytes()
+  self.Filter.Add(buff)
   for idx := range(self.hubs) {
     if self.hubs[idx] != nil {
       log.Println("send to hub")

@@ -169,3 +169,8 @@ func NewArcIdentityMessage(us Peer, privkey *ecdsa.PrivateKey) *ARCMessage {
   msg.Sign(privkey)
   return msg
 }
+
+
+func NewArcKADPingMessage(target []byte) *ARCMessage {
+  return nil
+}
