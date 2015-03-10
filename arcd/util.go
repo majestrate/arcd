@@ -3,6 +3,7 @@ package arcd
 import (
   "crypto/sha1"
   "encoding/base32"
+  "log"
   "os"
   "strings"
   "time"
@@ -29,26 +30,35 @@ func putshort(num uint16, buff []byte, off uint) {
 func getlong(buff []byte, off uint) uint64 {
   var retval uint64
   retval = 0
-  retval = retval | uint64(buff[0+off] << 56)
-  retval = retval | uint64(buff[1+off] << 48)
-  retval = retval | uint64(buff[2+off] << 40)
-  retval = retval | uint64(buff[3+off] << 32)
-  retval = retval | uint64(buff[4+off] << 24)
-  retval = retval | uint64(buff[5+off] << 16)
-  retval = retval | uint64(buff[6+off] << 8)
+  retval = retval | uint64(buff[0+off]) << 56
+  retval = retval | uint64(buff[1+off]) << 48
+  retval = retval | uint64(buff[2+off]) << 40
+  retval = retval | uint64(buff[3+off]) << 32
+  retval = retval | uint64(buff[4+off]) << 24
+  retval = retval | uint64(buff[5+off]) << 16
+  retval = retval | uint64(buff[6+off]) << 8
   retval = retval | uint64(buff[7+off])
   return retval
 }
 
 func putlong(num uint64, buff []byte, off uint) {
-  buff[0+off] = byte(0xff00000000000000 & num >> 56)
-  buff[1+off] = byte(0x00ff000000000000 & num >> 48)
-  buff[2+off] = byte(0x0000ff0000000000 & num >> 40)
-  buff[3+off] = byte(0x000000ff00000000 & num >> 32)
-  buff[4+off] = byte(0x00000000ff000000 & num >> 24)
-  buff[5+off] = byte(0x0000000000ff0000 & num >> 16)
-  buff[6+off] = byte(0x000000000000ff00 & num >> 8)
-  buff[7+off] = byte(0x00000000000000ff & num)
+  var n uint64
+  n = (0xff00000000000000 & num) >> 56
+  buff[0+off] = byte(n)
+  n = (0x00ff000000000000 & num) >> 48
+  buff[1+off] = byte(n)
+  n = (0x0000ff0000000000 & num) >> 40
+  buff[2+off] = byte(n)
+  n = (0x000000ff00000000 & num) >> 32
+  buff[3+off] = byte(n)
+  n = (0x00000000ff000000 & num) >> 24
+  buff[4+off] = byte(n)
+  n = (0x0000000000ff0000 & num) >> 16
+  buff[5+off] = byte(n)
+  n = (0x000000000000ff00 & num) >> 8
+  buff[6+off] = byte(n)
+  n = (0x00000000000000ff & num)
+  buff[7+off] = byte(n)
 }
 
 func TimeNow() uint64 {
@@ -74,5 +84,16 @@ func FileExists(fname string) bool {
 }
 
 func FormatHash(data []byte) string {
-  return strings.ToLower(strings.Trim(base32.HexEncoding.EncodeToString(data), "="))
+  return strings.ToLower(base32.HexEncoding.EncodeToString(data))
+}
+
+func UnFormatHash(data string) []byte {
+  data = strings.ToUpper(data)
+  dat, err := base32.HexEncoding.DecodeString(data)
+  if err != nil {
+ 
+    log.Println("error decoding data", err,    data[48])
+    return nil
+  }
+  return dat
 }

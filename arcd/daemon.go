@@ -1,7 +1,8 @@
 package arcd
 
 import (
-  "crypto/rsa"
+  "bytes"
+  "crypto/ecdsa"
   "log"
   "net"
   "time"
@@ -10,9 +11,11 @@ import (
 type Daemon struct {
   Listener *net.TCPListener
   Broadacst chan *ARCMessage
+  KadMessage chan *ARCMessage
   Filter DecayingBloomFilter
   Kad RoutingTable
-  PrivKey *rsa.PrivateKey
+  Us Peer
+  PrivKey *ecdsa.PrivateKey
   PeerLoader PeerFileLoader
   hubs []*HubHandler
 }
@@ -21,6 +24,7 @@ type HubHandler struct {
   conn net.Conn
   daemon *Daemon
   Broadacst chan *ARCMessage
+  TheirHash []byte
 }
 
 func (self *HubHandler) Init(daemon *Daemon, conn net.Conn) {
@@ -34,22 +38,24 @@ func (self *Daemon) Init() {
   fname := "privkey.pem"
   var err error
   if FileExists(fname) {
-    self.PrivKey, err = LoadRSA4K(fname)
+    self.PrivKey, err = LoadECC_256(fname)
     if err != nil {
       log.Fatal(err)
     }
   } else {
     log.Println("generate signing key")
-    self.PrivKey, err = GenerateRSA4K()
+    self.PrivKey, err = GenerateECC_256()
     if err != nil {
       log.Fatal(err)
     }
-    DumpRSA4K(self.PrivKey, fname)
+    DumpECC_256(self.PrivKey, fname)
   }
-  log.Println("our public key is", FormatHash(self.PrivKey.PublicKey.N.Bytes()))
-  self.Kad.OurHash = RSA4K_KeyHash(&self.PrivKey.PublicKey)
+ 
+  self.Kad.OurHash = ECC_256_KeyHash(self.PrivKey.PublicKey)
+  log.Println("our hash is", FormatHash(self.Kad.OurHash))
   self.Kad.Init()
   self.Broadacst = make(chan *ARCMessage, 24)
+  self.KadMessage = make(chan *ARCMessage, 24)
   self.Filter.Init() 
   self.hubs = make([]*HubHandler, 128)
 }
@@ -82,6 +88,10 @@ func (self *Daemon) Bind(addr string) error {
   if err == nil {
     log.Println("bound on", self.Listener.Addr())
   }
+  self.Us.Addr = addr
+  self.Us.Net = "ipv6"
+  self.Us.PubKey = ECC_256_PubKey_ToString(self.PrivKey.PublicKey)
+  log.Println("our public key is", self.Us.PubKey)
   return err
 }
 
@@ -100,6 +110,7 @@ func (self *Daemon) PersistHub(addr string) {
     log.Println("connect to hub", addr)
     var handler HubHandler
     handler.Init(self, conn)
+    handler.SendIdent()
     go handler.WriteMessages()
     handler.ReadMessages()
   }
@@ -127,6 +138,11 @@ func (self *Daemon) AddHub(addr string) {
   go self.PersistHub(addr)
 }
 
+func (self *HubHandler) SendIdent() {
+  msg := NewArcIdentityMessage(self.daemon.Us, self.daemon.PrivKey)
+  self.Broadacst <- msg
+}
+
 func (self *HubHandler) ReadMessages() {
   log.Println("reading...")
   for {
@@ -144,7 +160,28 @@ func (self *HubHandler) ReadMessages() {
     }
     self.daemon.Filter.Add(buff)
     log.Println("Got Message of size", msg.MessageLength)
-    self.daemon.Broadacst <- msg
+    
+    if msg.MessageType == ARC_MESG_TYPE_DHT {
+      peerHash := msg.DestHash
+      closest := self.daemon.Kad.GetClosestPeer(peerHash)
+      if self.daemon.Kad.HashIsUs(closest) {
+        self.daemon.KadMessage <- msg
+      } else {
+        self.daemon.SendTo(closest, msg)
+      }
+    } else if msg.MessageType == ARC_MESG_TYPE_CHAT { 
+      self.daemon.Broadacst <- msg
+    } else  if msg.MessageType == ARC_MESG_TYPE_CTL {
+      verified := msg.VerifyIdentity() 
+      if verified {
+        pubkey := msg.GetPubKey()
+        hash := ECC_256_KeyHash(pubkey)
+        if self.TheirHash == nil {
+          self.TheirHash = hash
+          log.Println("hub identified as", FormatHash(hash))
+        }
+      }
+    }
   }
 }
 
@@ -168,11 +205,32 @@ func (self *HubHandler) WriteMessages() {
   }
 }
 
-func (self *Daemon) SendTo(target []byte, line string) {
-  msg := NewArcIRCLine(line)
-  msg.Sign(self.PrivKey)
-  copybytes(msg.DestHash, target, 0, 0, ARC_HASH_LEN)
-  self.Broadacst <- msg
+func (self *Daemon) SendTo(target []byte, msg *ARCMessage) {
+  for idx := range(self.hubs) {
+    if self.hubs[idx] != nil {
+      hub := self.hubs[idx]
+      if hub.TheirHash != nil {
+        if bytes.Equal(hub.TheirHash, target) {
+          hub.Broadacst <- msg
+          return
+        }
+      }
+    }
+  }
+}
+
+func (self *Daemon) got_Broadcast(msg *ARCMessage, ircd *IRCD) {
+  ircd.Broadcast <- string(msg.MessageData)
+  for idx := range(self.hubs) {
+    if self.hubs[idx] != nil {
+      log.Println("send to hub")
+      self.hubs[idx].Broadacst <- msg
+    }
+  }
+}
+
+func (self *Daemon) got_KadMesssage(msg *ARCMessage) {
+  
 }
 
 func (self *Daemon) Run(ircd *IRCD) {
@@ -184,16 +242,12 @@ func (self *Daemon) Run(ircd *IRCD) {
     if counter == 0 {
       self.Filter.Decay()
     }
-    msg := <- self.Broadacst
-    log.Println("got message")
-    if msg != nil {
-      ircd.Broadcast <- string(msg.MessageData)
-      for idx := range(self.hubs) {
-        if self.hubs[idx] != nil {
-          log.Println("send to hub")
-          self.hubs[idx].Broadacst <- msg
-        }
-      }
+    var msg *ARCMessage
+    select {
+      case msg = <- self.Broadacst:
+        self.got_Broadcast(msg, ircd)
+      case msg = <- self.KadMessage:
+        self.got_KadMesssage(msg)
     }
   }
 }
@@ -203,9 +257,10 @@ func (self *Daemon) Accept() {
     conn, err := self.Listener.Accept()
     if err != nil {
       log.Fatal("error in Daemon::Accept()", err)
+      return
     }
     log.Println("new incoming hub connection", conn.RemoteAddr())
-    var handler HubHandler
+    handler := new(HubHandler)
     handler.Init(self, conn)
     go handler.ReadMessages()
     go handler.WriteMessages()

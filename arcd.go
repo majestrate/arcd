@@ -5,6 +5,7 @@ import (
 )
 
 func main() {
+  arcd.TestCrypto()
   peers := flag.String("peers", "peers.txt", "peers file")
   bind := flag.String("bind", "[::]:0", "bind hub to address")
   ircd_bind := flag.String("ircd", "[::]:0", "bind ircd to address")

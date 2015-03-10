@@ -14,6 +14,28 @@ type Peer struct {
   PubKey string
 }
 
+// serialize to bytes
+func (self *Peer) Bytes() []byte {
+  var buff bytes.Buffer
+  buff.WriteString(self.Net)
+  buff.WriteString(" ")
+  buff.WriteString(self.Addr)
+  buff.WriteString(" ")
+  buff.WriteString(self.PubKey)
+  return buff.Bytes()
+}
+
+func (self *Peer) Parse(line string) bool {
+  parts := strings.Split(line, " ")
+  if len(parts) != 3 {
+      return false
+  }
+  self.PubKey = parts[2]
+  self.Addr = parts[1]
+  self.Net = parts[0]
+  return true
+}
+
 type PeerFileLoader struct {
   Peers []Peer
 }
@@ -32,15 +54,10 @@ func (self *PeerFileLoader) LoadFile(fname string) error {
       continue
     }
     var peer Peer
-    parts := strings.Split(string(line), " ")
-    if len(parts) != 3 {
-      continue
+    if peer.Parse(string(line)) {
+      peers[peer_count] = peer
+      peer_count ++
     }
-    peer.PubKey = parts[2]
-    peer.Addr = parts[1]
-    peer.Net = parts[0]
-    peers[peer_count] = peer
-    peer_count ++
   }
   self.Peers = make([]Peer, peer_count)
   for idx := range(self.Peers) {

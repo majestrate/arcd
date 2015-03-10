@@ -2,28 +2,30 @@ package arcd
 
 import (
   "bytes"
-  "crypto/rsa"
+  //"crypto/rsa"
+  "crypto/ecdsa"
   "io"
   "log"
 )
 
 const ARC_HASH_LEN uint = 32
+const ARC_SIG_LEN uint = 64
 const ARC_HEADER_LEN uint16 = uint16(ARC_HASH_LEN * 2 + 2 + 2 + 8 + 1)
 const (
   // control message
-  ARC_MESG_TYPE_CTL = iota
+  ARC_MESG_TYPE_CTL = iota +1
   // plain chat message
   ARC_MESG_TYPE_CHAT
   // encrypted chat message
   ARC_MESG_TYPE_CRYPT_CHAT
   // dht routed message
-  ARCH_MESG_TYPE_DHT
+  ARC_MESG_TYPE_DHT
 )
 
 
 type ARCMessage struct {
   // begin header
-  ProtocolByte uint8 // right now it's 0x00
+  ProtocolByte uint8 // right now it's 0x01
   // for dht
   SourceHash []byte
   DestHash []byte
@@ -45,7 +47,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
   mesg := new(ARCMessage)
   mesg.Init(0)
   // protocol zero
-  if hdr[0] == 0 {
+  if hdr[0] == 1 {
     mesg.ProtocolByte = hdr[0]
     copybytes(mesg.SourceHash, hdr, 0, 1, ARC_HASH_LEN)
     copybytes(mesg.DestHash, hdr, 0, 1 + ARC_HASH_LEN, ARC_HASH_LEN)
@@ -66,6 +68,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
 }
 
 func (self *ARCMessage) Init(mtype uint16) {
+  self.ProtocolByte = 1
   self.SourceHash = make([]byte, ARC_HASH_LEN)
   self.DestHash = make([]byte, ARC_HASH_LEN)
   self.MessageType = mtype
@@ -98,23 +101,54 @@ func (self *ARCMessage) Bytes() []byte {
   return buff
 }
 
-func (self *ARCMessage) Sign(privkey *rsa.PrivateKey) {
-  self.MessageLength += 32
+func (self *ARCMessage) Sign(privkey *ecdsa.PrivateKey) {
+
+  self.MessageLength += uint16(ARC_SIG_LEN)
+  nosig := make([]byte, ARC_SIG_LEN)
+  
+  var oldmsg bytes.Buffer
+  oldmsg.Write(self.MessageData)
+  oldmsg.Write(nosig)
+  self.MessageData = oldmsg.Bytes()
+  
   buff := self.Bytes()
-  sig, err := SignRSA4K(buff, privkey)
+  //log.Println(buff)
+  sig, err := SignECC_256(buff, privkey)
   if err != nil {
     log.Fatal(err)
   }
-  log.Println("sig len=", len(sig))
+  //log.Println(sig)
+  copybytes(self.MessageData, sig, uint(uint(self.MessageLength) - ARC_SIG_LEN), 0, uint(ARC_SIG_LEN))
+  
 }
 
-func NewArcPing() *ARCMessage {
-  buff := bytes.NewBufferString("PING")
-  msg := new(ARCMessage)
-  msg.Init(ARC_MESG_TYPE_CTL)
-  msg.SetPayload(buff.Bytes())
-  msg.StampTime()
-  return msg
+func (self *ARCMessage) Verify(pubkey *ecdsa.PublicKey) bool {
+  buff := self.Bytes()
+  idx := len(buff) - int(ARC_SIG_LEN)
+  sig := make([]byte, ARC_SIG_LEN)
+  copybytes(sig, buff, 0, uint(idx), ARC_SIG_LEN)
+  
+  // zero out sig
+  for c := 0 ; c < int(ARC_SIG_LEN) ; c++ {
+    buff[idx+c] = 0
+  }
+  return VerifyECC_256(buff, sig, pubkey)
+}
+
+func (self *ARCMessage) GetPubKey() ecdsa.PublicKey {
+  data := self.MessageData[:len(self.MessageData)-int(ARC_SIG_LEN)]
+  var peer Peer
+  if ! peer.Parse(string(data)) {
+    log.Println("invalid peer data", string(data))
+    var dummy ecdsa.PublicKey
+    return dummy
+  }
+  return ECC_256_UnPackPubKeyString(peer.PubKey)
+}
+
+func (self *ARCMessage) VerifyIdentity() bool {
+  pubkey := self.GetPubKey()
+  return self.Verify(&pubkey)
 }
 
 func NewArcIRCLine(line string) *ARCMessage {
@@ -124,5 +158,14 @@ func NewArcIRCLine(line string) *ARCMessage {
   msg.Init(ARC_MESG_TYPE_CHAT)
   msg.SetPayload(buff.Bytes())
   msg.StampTime()
+  return msg
+}
+
+func NewArcIdentityMessage(us Peer, privkey *ecdsa.PrivateKey) *ARCMessage {
+  msg := new(ARCMessage)
+  msg.Init(ARC_MESG_TYPE_CTL)
+  msg.SetPayload(us.Bytes())
+  msg.StampTime()
+  msg.Sign(privkey)
   return msg
 }

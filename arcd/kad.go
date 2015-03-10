@@ -134,3 +134,7 @@ func (self *RoutingTable) GetClosestPeer(target []byte) []byte {
   log.Println("kad dist=", dist)
   return nil
 }
+
+func (self *RoutingTable) HashIsUs(target []byte) bool {
+  return bytes.Equal(target, self.OurHash)
+}
