@@ -171,6 +171,14 @@ func NewArcIdentityMessage(us Peer, privkey *ecdsa.PrivateKey) *ARCMessage {
 }
 
 
-func NewArcKADPingMessage(target []byte) *ARCMessage {
-  return nil
+func NewArcKADMessage(target []byte) *ARCMessage {
+  msg := new(ARCMessage)
+  msg.Init(ARC_MESG_TYPE_DHT)
+  l := len(target)
+  copybytes(msg.DestHash, target, 0, 0, uint(l))
+  var buff bytes.Buffer
+  buff.WriteString("Benis")
+  msg.SetPayload(buff.Bytes())
+  msg.StampTime()
+  return msg
 }

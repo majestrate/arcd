@@ -164,6 +164,6 @@ func (self *IRC) Greet() {
   self.SendLine("002 :"+self.Nick+"!user@arcd")
   self.SendLine("003 :arcd")
   self.SendLine("004 arcd 0.0 :+")
-  self.SendLine("005 NETWORK=ARCNET CHANTYPES=#&!+ CASEMAPPING=ascii HANLIMIT=25 NICKLEN=25 TOPICLEN=128 CHANNELLEN=16 COLOUR=1 UNICODE=1 PRESENCE=0:")
+  self.SendLine("005 NETWORK=ARCNET CHANTYPES=#&!+ CASEMAPPING=ascii CHANLIMIT=25 NICKLEN=25 TOPICLEN=128 CHANNELLEN=16 COLOUR=1 UNICODE=1 PRESENCE=0:")
   self.Motd()
 }

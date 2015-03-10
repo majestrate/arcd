@@ -91,8 +91,7 @@ func UnFormatHash(data string) []byte {
   data = strings.ToUpper(data)
   dat, err := base32.HexEncoding.DecodeString(data)
   if err != nil {
- 
-    log.Println("error decoding data", err,    data[48])
+    log.Println("error decoding data", err) 
     return nil
   }
   return dat

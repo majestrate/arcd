@@ -74,7 +74,7 @@ func (self *Daemon) LoadPeers(fname string) {
 
 func (self *Daemon) AddPeer(net, addr, pubkey string) {
   log.Println("Add peer", net, addr, pubkey)
-  go self.PersistHub(addr)
+  go self.PersistHub(addr, pubkey)
 }
 
 func (self *Daemon) Bind(addr string) error {
@@ -95,11 +95,12 @@ func (self *Daemon) Bind(addr string) error {
   return err
 }
 
-func (self *Daemon) PersistHub(addr string) {
+func (self *Daemon) PersistHub(addr, pubkey string) {
   if len(addr) == 0 {
     return
   }
   log.Println("persist hub at", addr)
+  hash := ECC_256_KeyHash(ECC_256_UnPackPubKeyString(pubkey))
   for {
     time.Sleep(time.Second *1)
     conn, err := net.Dial("tcp6", addr)
@@ -110,9 +111,12 @@ func (self *Daemon) PersistHub(addr string) {
     log.Println("connect to hub", addr)
     var handler HubHandler
     handler.Init(self, conn)
+    handler.TheirHash = hash
     handler.SendIdent()
+    self.Kad.Insert(hash)
     go handler.WriteMessages()
     handler.ReadMessages()
+    self.Kad.Remove(hash)
   }
 }
 
@@ -132,10 +136,6 @@ func (self *Daemon) hubRemove(handler *HubHandler) {
       self.hubs[idx] = nil
     }
   }
-}
-
-func (self *Daemon) AddHub(addr string) {
-  go self.PersistHub(addr)
 }
 
 func (self *HubHandler) SendIdent() {
@@ -166,6 +166,7 @@ func (self *HubHandler) ReadMessages() {
       if self.daemon.Kad.HashIsUs(closest) {
         self.daemon.KadMessage <- msg
       } else {
+        log.Println("relay kad message to", FormatHash(closest))
         self.daemon.SendTo(closest, msg)
       }
     } else if msg.MessageType == ARC_MESG_TYPE_CHAT { 
@@ -177,10 +178,21 @@ func (self *HubHandler) ReadMessages() {
         hash := ECC_256_KeyHash(pubkey)
         if self.TheirHash == nil {
           self.TheirHash = hash
+          self.daemon.Kad.Insert(hash)
           log.Println("hub identified as", FormatHash(hash))
         }
       }
     }
+  }
+}
+
+func (self *Daemon) SendKad(target []byte, msg *ARCMessage) {
+  closest := self.Kad.GetClosestPeer(target)
+  if self.Kad.HashIsUs(closest) {
+    self.KadMessage <- msg
+  } else {
+    log.Println("send kad message to", FormatHash(closest))
+    self.SendTo(closest, msg)
   }
 }
 
@@ -227,7 +239,7 @@ func (self *Daemon) got_Broadcast(msg *ARCMessage, ircd *IRCD) {
 }
 
 func (self *Daemon) got_KadMesssage(msg *ARCMessage) {
-  
+  log.Println("we got a kad message :D")
 }
 
 func (self *Daemon) Run(ircd *IRCD) {

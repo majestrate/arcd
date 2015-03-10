@@ -131,8 +131,30 @@ func bucketIndexForHash(hash []byte) uint {
 
 func (self *RoutingTable) GetClosestPeer(target []byte) []byte {
   dist := getHashDistance(self.OurHash, target)
-  log.Println("kad dist=", dist)
-  return nil
+  idx := bucketIndexForHash(target)
+  log.Println("kad dist=", dist, " idx=", idx)
+  
+  var hash []byte
+  var distmin uint
+  distmin = 900000 // big number
+  for count := 0 ; count < len(self.Buckets) ; count ++ {
+    bucket := &self.Buckets[idx]
+    for {
+      if bucket.Data == nil {
+        break
+      }
+      curdist := getHashDistance(bucket.Data, target)
+      if curdist < distmin {
+        hash = bucket.Data
+        distmin = curdist
+      }
+      if bucket.Next != nil {
+        bucket = bucket.Next
+      }
+    }
+    idx = ( idx + uint(1) ) % uint( len(self.Buckets) )
+  }
+  return hash
 }
 
 func (self *RoutingTable) HashIsUs(target []byte) bool {
