@@ -25,6 +25,7 @@ type HubHandler struct {
   daemon *Daemon
   Broadacst chan *ARCMessage
   TheirHash []byte
+  KadTries map[string][][]byte // key = target, val = keys tried
 }
 
 func (self *HubHandler) Init(daemon *Daemon, conn net.Conn) {
@@ -162,12 +163,44 @@ func (self *HubHandler) ReadMessages() {
     
     if msg.MessageType == ARC_MESG_TYPE_DHT {
       peerHash := msg.DestHash
-      closest := self.daemon.Kad.GetClosestPeer(peerHash)
-      if self.daemon.Kad.HashIsUs(closest) {
+      peerHashStr := FormatHash(peerHash)
+      if msg.GetPayloadString() == "NACK" {
+        // backtrack
+        val, ok := self.KadTries[peerHashStr]
+        if ! ok {
+          // we started this search
+          val =  make([][]byte, MAX_KAD_TRIES)
+          self.KadTries[peerHashStr] = val
+        } 
+        closest := self.daemon.Kad.GetClosestPeerExcludes(peerHash, val)
+        var put bool
+        for idx := range(val) {
+          if val[idx] == nil {
+            val[idx] = closest
+            put = true
+            break
+          }
+        }
+        if put {
+          msg.SetPayloadString("FIND")
+          self.daemon.SendTo(closest, msg)
+        } else {
+          log.Println("giving up on kad search for", msg.DestHash)
+          self.Broadacst <- msg
+        }
+      }
+      
+      if self.daemon.Kad.HashIsUs(peerHash) {
         self.daemon.KadMessage <- msg
       } else {
-        log.Println("relay kad message to", FormatHash(closest))
-        self.daemon.SendTo(closest, msg)
+        closest := self.daemon.Kad.GetClosestPeerNotMe(peerHash)
+        // we don't have any closest peers?
+        if closest == nil {
+          self.Broadacst <- NewArcKADMessage(peerHash, "NACK")
+        } else {
+          log.Println("relay kad message to", FormatHash(closest))
+          self.daemon.SendTo(closest, msg)
+        }
       }
     } else if msg.MessageType == ARC_MESG_TYPE_CHAT { 
       self.daemon.Broadacst <- msg
@@ -187,9 +220,9 @@ func (self *HubHandler) ReadMessages() {
 }
 
 func (self *Daemon) SendKad(target []byte, msg *ARCMessage) {
-  closest := self.Kad.GetClosestPeer(target)
-  if self.Kad.HashIsUs(closest) {
-    self.KadMessage <- msg
+  closest := self.Kad.GetClosestPeerNotMe(target)
+  if closest == nil {
+    log.Println("we have no peers to send to for target", FormatHash(target))
   } else {
     log.Println("send kad message to", FormatHash(closest))
     self.SendTo(closest, msg)

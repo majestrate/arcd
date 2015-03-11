@@ -8,6 +8,7 @@ import (
 const KBUCKET_HASH_BITS uint = 256
 const KBUCKET_SCALE uint = 8
 const KBUCKET_NUMBER uint = KBUCKET_HASH_BITS / KBUCKET_SCALE
+const MAX_KAD_TRIES uint = 32
 
 type KBucket struct {
   Data []byte
@@ -129,24 +130,62 @@ func bucketIndexForHash(hash []byte) uint {
   return countBits(hash) /  KBUCKET_SCALE
 }
 
-func (self *RoutingTable) GetClosestPeer(target []byte) []byte {
+func (self *RoutingTable) GetClosestPeerNotMe(target []byte) []byte {
+  exclude := make([][]byte, 1)
+  exclude[0] = self.OurHash
+  return self.GetClosestPeerExcludes(target, exclude)
+}
+
+func (self *RoutingTable) GetClosestPeerExcludes(target []byte, exclude [][]byte) []byte {
+  ret := self.GetClosestPeers(target, 1, exclude)
+  if ret == nil {
+    return nil
+  } else {
+    return ret[0]
+  }
+}
+
+func (self *RoutingTable) GetClosestPeersNotMe(target []byte, want uint) [][]byte {
+  exclude := make([][] byte, 1)
+  exclude[0] = self.OurHash
+  return self.GetClosestPeers(target, want, exclude)
+}
+
+func (self *RoutingTable) GetClosestPeers(target []byte, want uint, exclude [][]byte) [][]byte {
   dist := getHashDistance(self.OurHash, target)
   idx := bucketIndexForHash(target)
   log.Println("kad dist=", dist, " idx=", idx)
   
-  var hash []byte
+  hashes := make([][]byte, want)
+  var got_hashes uint
   var distmin uint
+  
   distmin = 900000 // big number
-  for count := 0 ; count < len(self.Buckets) ; count ++ {
+  
+  for count := 0 ; count < len(self.Buckets) && got_hashes < want ; count ++ {
     bucket := &self.Buckets[idx]
     for {
-      if bucket.Data == nil {
+      if bucket.Data == nil || got_hashes == want {
         break
       }
       curdist := getHashDistance(bucket.Data, target)
       if curdist < distmin {
-        hash = bucket.Data
-        distmin = curdist
+        skip := false
+        if exclude != nil {
+          for exidx := range(exclude) {
+            try := exclude[exidx]
+            if try != nil {
+              if bytes.Equal(try, bucket.Data) {
+                skip = true
+              }
+            }
+          }
+        }
+        if ! skip {
+          hashes[got_hashes] = bucket.Data
+          got_hashes ++
+          distmin = curdist
+        }
       }
       if bucket.Next != nil {
         bucket = bucket.Next
@@ -154,7 +193,15 @@ func (self *RoutingTable) GetClosestPeer(target []byte) []byte {
     }
     idx = ( idx + uint(1) ) % uint( len(self.Buckets) )
   }
-  return hash
+  if got_hashes == 0 {
+    return nil
+  }
+  ret := make([][]byte, got_hashes)
+  var counter uint
+  for ; counter < got_hashes ; counter ++ {
+    ret[counter] = hashes[counter]
+  }
+  return ret
 }
 
 func (self *RoutingTable) HashIsUs(target []byte) bool {

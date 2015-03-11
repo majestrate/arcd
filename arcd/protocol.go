@@ -151,6 +151,16 @@ func (self *ARCMessage) VerifyIdentity() bool {
   return self.Verify(&pubkey)
 }
 
+func (self *ARCMessage) SetPayloadString(data string) {
+  var buff bytes.Buffer
+  buff.WriteString(data)
+  self.SetPayload(buff.Bytes())
+}
+
+func (self *ARCMessage) GetPayloadString() string {
+  return string(self.MessageData)
+}
+
 func NewArcIRCLine(line string) *ARCMessage {
   log.Println("new irc line", line)
   buff := bytes.NewBufferString(line)
@@ -171,13 +181,13 @@ func NewArcIdentityMessage(us Peer, privkey *ecdsa.PrivateKey) *ARCMessage {
 }
 
 
-func NewArcKADMessage(target []byte) *ARCMessage {
+func NewArcKADMessage(target []byte, data string) *ARCMessage {
   msg := new(ARCMessage)
   msg.Init(ARC_MESG_TYPE_DHT)
   l := len(target)
   copybytes(msg.DestHash, target, 0, 0, uint(l))
   var buff bytes.Buffer
-  buff.WriteString("Benis")
+  buff.WriteString(data)
   msg.SetPayload(buff.Bytes())
   msg.StampTime()
   return msg

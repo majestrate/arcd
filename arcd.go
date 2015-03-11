@@ -26,7 +26,7 @@ func main() {
     time.Sleep(time.Second)
     if *ping != "" {
       peer := arcd.UnFormatHash(*ping)
-      msg := arcd.NewArcKADMessage(peer)
+      msg := arcd.NewArcKADMessage(peer, "FIND")
       daemon.SendKad(peer, msg)
     }
   }
