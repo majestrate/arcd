@@ -83,7 +83,7 @@ func (self *Daemon) LoadPeers(fname string) {
 
 func (self *Daemon) HasPeer(peer Peer) bool {
   for idx := range(self.KnownPeers) {
-    if self.KnownPeers[idx].Addr == peer.Addr {
+    if self.KnownPeers[idx].PubKey == peer.PubKey {
       return true
     }
   }
