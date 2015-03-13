@@ -191,9 +191,10 @@ func NewArcPeersMessage(peers []Peer) *ARCMessage {
       break
     }
     peer := peers[idx]
-    log.Println(peer.Addr)
-    buff.Write(peer.Bytes())
-    buff.WriteString("\n")
+    if peer.PubKey != ""  {
+      buff.Write(peer.Bytes())
+      buff.WriteString("\n")
+    }
     counter --
   }
   msg.SetPayload(buff.Bytes())

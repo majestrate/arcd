@@ -101,7 +101,7 @@ func (self *Daemon) AddPeer(peer Peer) {
   }
   self.AddPeerStr(peer.Net, peer.Addr, peer.PubKey)
   for idx := range(self.KnownPeers) {
-    if self.KnownPeers[idx].Addr == "" {
+    if self.KnownPeers[idx].PubKey == "" {
       self.KnownPeers[idx] = peer
     }
   }
@@ -301,29 +301,9 @@ func (self *HubHandler) ReadMessages() {
           log.Println("hub identified as", FormatHash(hash))
           self.TheirHash = hash
           self.daemon.Kad.Insert(hash)
+        
+          self.Broadacst <- NewArcPeersMessage(self.daemon.KnownPeers)
           
-          peercount := 16
-          peersadded := 0
-          peers := make([]Peer, peercount)
-          for counter := 0 ; counter < peercount ; counter ++ {
-            peer := self.daemon.KnownPeers[counter]
-            if peer.Addr != "" {
-              peers[counter] = peer
-              peersadded ++
-            }
-          }
-          addpeers := make([]Peer, peersadded)
-          idx := 0
-          for  {
-            if idx == peersadded {
-              break
-            }
-            addpeers[idx] = peers[idx]
-            idx ++
-          }
-          if peersadded > 0 {
-            self.Broadacst <- NewArcPeersMessage(addpeers)
-          }
         }
       } else {
         peers := msg.GetPayloadString()
