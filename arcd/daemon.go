@@ -81,7 +81,24 @@ func (self *Daemon) LoadPeers(fname string) {
   }
 }
 
+func (self *Daemon) HasPeer(peer Peer) bool {
+  for idx := range(self.KnownPeers) {
+    if self.KnownPeers[idx].Addr == peer.Addr {
+      return true
+    }
+  }
+  return false
+}
+
 func (self *Daemon) AddPeer(peer Peer) {
+  if peer.Addr == self.Us.Addr {
+    log.Println("not adding self")
+    return
+  }
+  if self.HasPeer(peer) {
+    log.Println("already have peer", peer.Addr)
+    return 
+  }
   self.AddPeerStr(peer.Net, peer.Addr, peer.PubKey)
   for idx := range(self.KnownPeers) {
     if self.KnownPeers[idx].Addr == "" {
@@ -91,10 +108,6 @@ func (self *Daemon) AddPeer(peer Peer) {
 }
 
 func (self *Daemon) AddPeerStr(net, addr, pubkey string) {
-  if addr == self.Us.Addr {
-    log.Println("not adding self")
-    return
-  }
   if self.numhubs < uint(len(self.hubs)) {
     log.Println("Add peer", net, addr, pubkey)
     go self.PersistHub(net, addr, pubkey)
