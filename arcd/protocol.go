@@ -180,6 +180,27 @@ func NewArcIdentityMessage(us Peer, privkey *ecdsa.PrivateKey) *ARCMessage {
   return msg
 }
 
+func NewArcPeersMessage(peers []Peer) *ARCMessage {
+  msg := new(ARCMessage)
+  msg.Init(ARC_MESG_TYPE_CTL)
+  var buff bytes.Buffer
+  // max 30 peers
+  counter := 30
+  for idx := range(peers) {
+    if counter == 0 {
+      break
+    }
+    peer := peers[idx]
+    log.Println(peer.Addr)
+    buff.Write(peer.Bytes())
+    buff.WriteString("\n")
+    counter --
+  }
+  msg.SetPayload(buff.Bytes())
+  msg.StampTime()
+  return msg
+}
+
 
 func NewArcKADMessage(target []byte, data string) *ARCMessage {
   msg := new(ARCMessage)

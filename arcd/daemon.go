@@ -3,8 +3,11 @@ package arcd
 import (
   "bytes"
   "crypto/ecdsa"
+  "errors"
   "log"
   "net"
+  "strconv"
+  "strings"
   "time"
 )
 
@@ -14,10 +17,13 @@ type Daemon struct {
   KadMessage chan *ARCMessage
   Filter DecayingBloomFilter
   Kad RoutingTable
+  torproc *TorProc
   Us Peer
   PrivKey *ecdsa.PrivateKey
   PeerLoader PeerFileLoader
   hubs []*HubHandler
+  numhubs uint
+  KnownPeers []Peer
 }
 
 type HubHandler struct {
@@ -59,6 +65,8 @@ func (self *Daemon) Init() {
   self.KadMessage = make(chan *ARCMessage, 24)
   self.Filter.Init() 
   self.hubs = make([]*HubHandler, 128)
+  self.KnownPeers = make([]Peer, 128)
+
 }
 
 func (self *Daemon) LoadPeers(fname string) {
@@ -69,16 +77,29 @@ func (self *Daemon) LoadPeers(fname string) {
   }
   for idx := range(self.PeerLoader.Peers) {
     peer := self.PeerLoader.Peers[idx]
-    self.AddPeer(peer.Net, peer.Addr, peer.PubKey)
+    self.AddPeer(peer)
   }
 }
 
-func (self *Daemon) AddPeer(net, addr, pubkey string) {
-  log.Println("Add peer", net, addr, pubkey)
-  go self.PersistHub(addr, pubkey)
+func (self *Daemon) AddPeer(peer Peer) {
+  self.AddPeerStr(peer.Net, peer.Addr, peer.PubKey)
+  for idx := range(self.KnownPeers) {
+    if self.KnownPeers[idx].Addr == "" {
+      self.KnownPeers[idx] = peer
+    }
+  }
 }
 
-func (self *Daemon) Bind(addr string) error {
+func (self *Daemon) AddPeerStr(net, addr, pubkey string) {
+  if self.numhubs < uint(len(self.hubs)) {
+    log.Println("Add peer", net, addr, pubkey)
+    go self.PersistHub(net, addr, pubkey)
+  } else {
+    log.Println("Not adding hub, too many connections")
+  }
+}
+
+func (self *Daemon) Bind(addr string, socksport int) error {
   var err error
   var netaddr *net.TCPAddr
   netaddr, err = net.ResolveTCPAddr("tcp6", addr)
@@ -86,17 +107,62 @@ func (self *Daemon) Bind(addr string) error {
     return err
   }
   self.Listener, err = net.ListenTCP("tcp6", netaddr)
-  if err == nil {
-    log.Println("bound on", self.Listener.Addr())
+  
+  if err != nil {
+    return err
   }
-  self.Us.Addr = addr
-  self.Us.Net = "ipv6"
+  ouraddr := self.Listener.Addr()
+  log.Println("bound on", ouraddr)
+  
+  
+  // spawn tor
+  self.torproc = SpawnTor(socksport)
+  self.torproc.Start()
+  time.Sleep(time.Second)
+  onion := self.torproc.GetOnion()
+  // load / run daeoms
+  
+  self.Us.Net = "tor"
+  self.Us.Addr = onion+":11001"
   self.Us.PubKey = ECC_256_PubKey_ToString(self.PrivKey.PublicKey)
   log.Println("our public key is", self.Us.PubKey)
+  log.Println("our onion is", onion)
   return err
 }
 
-func (self *Daemon) PersistHub(addr, pubkey string) {
+func (self *Daemon) connectForNet(network, addr string) (net.Conn, error) {
+
+  if network == "tor" {
+    // connect to socks proxy
+    conn, err := net.Dial("tcp", self.torproc.SocksAddr())
+    if err != nil {
+      return conn, err
+    }
+    var buff bytes.Buffer
+    // socks request
+    host := strings.Split(addr, ":")[0]
+    port, err := strconv.Atoi(strings.Split(addr, ":")[1])
+    if err != nil {
+      conn.Close()
+      return conn, err
+    }
+    
+    buff.Write([]byte{ 4, 1, byte( (port >> 8) ), byte( (port & 0xff) ), 0, 0, 0, 1, 54, 0})
+    buff.WriteString(host)
+    buff.Write([]byte{0})
+    conn.Write(buff.Bytes())
+    recvbuff := make([]byte, 8)
+    conn.Read(recvbuff)
+    if recvbuff[1] != 0x5a {
+      conn.Close()
+      return conn, errors.New("failed to connect via socks proxy")
+    }
+    return conn, nil
+  }
+  return net.Dial("tcp6", addr)
+}
+
+func (self *Daemon) PersistHub(network, addr, pubkey string) {
   if len(addr) == 0 {
     return
   }
@@ -104,7 +170,7 @@ func (self *Daemon) PersistHub(addr, pubkey string) {
   hash := ECC_256_KeyHash(ECC_256_UnPackPubKeyString(pubkey))
   for {
     time.Sleep(time.Second *1)
-    conn, err := net.Dial("tcp6", addr)
+    conn, err := self.connectForNet(network, addr) 
     if err != nil {
       log.Println("failed to connect to hub", err)
       continue
@@ -122,19 +188,24 @@ func (self *Daemon) PersistHub(addr, pubkey string) {
 }
 
 func (self *Daemon) hubAdd(handler *HubHandler) {
-  for idx := range(self.hubs) {
-    if self.hubs[idx] == nil {
-      self.hubs[idx] = handler
-      return
+  if self.numhubs < uint(len(self.hubs)) {
+    for idx := range(self.hubs) {
+      if self.hubs[idx] == nil {
+        self.hubs[idx] = handler
+        self.numhubs ++
+        return
+      }
     }
   }
-  log.Fatal("too many hubs connected")
+  log.Println("too many connections")
+  handler.conn.Close()
 }
 
 func (self *Daemon) hubRemove(handler *HubHandler) {
   for idx := range(self.hubs) {
     if handler == self.hubs[idx] {
       self.hubs[idx] = nil
+      self.numhubs --
     }
   }
 }
@@ -205,14 +276,47 @@ func (self *HubHandler) ReadMessages() {
     } else if msg.MessageType == ARC_MESG_TYPE_CHAT { 
       self.daemon.Broadacst <- msg
     } else  if msg.MessageType == ARC_MESG_TYPE_CTL {
-      verified := msg.VerifyIdentity() 
-      if verified {
-        pubkey := msg.GetPubKey()
-        hash := ECC_256_KeyHash(pubkey)
-        if self.TheirHash == nil {
+      if self.TheirHash == nil {
+        verified := msg.VerifyIdentity() 
+        if verified {
+          pubkey := msg.GetPubKey()
+          hash := ECC_256_KeyHash(pubkey)
+          log.Println("hub identified as", FormatHash(hash))
           self.TheirHash = hash
           self.daemon.Kad.Insert(hash)
-          log.Println("hub identified as", FormatHash(hash))
+          
+          peercount := 16
+          peersadded := 0
+          peers := make([]Peer, peercount)
+          for counter := 0 ; counter < peercount ; counter ++ {
+            peer := self.daemon.KnownPeers[counter]
+            if peer.Addr != "" {
+              peers[counter] = peer
+              peersadded ++
+            }
+          }
+          addpeers := make([]Peer, peersadded)
+          idx := 0
+          for  {
+            if idx == peersadded {
+              break
+            }
+            addpeers[idx] = peers[idx]
+            idx ++
+          }
+          if peersadded > 0 {
+            self.Broadacst <- NewArcPeersMessage(addpeers)
+          }
+        }
+      } else {
+        peers := msg.GetPayloadString()
+        lines := strings.Split(peers, "\n")
+        for idx := range(lines) {
+          line := lines[idx]
+          var peer Peer
+          if peer.Parse(line) {
+            self.daemon.AddPeer(peer)
+          }
         }
       }
     }

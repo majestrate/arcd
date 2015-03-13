@@ -1,0 +1,4 @@
+DataDir tordata
+HiddenServiceDir tordata/arcd
+HiddenServicePort 11001 [::1]:11001
+SocksPort 11005

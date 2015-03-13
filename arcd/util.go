@@ -83,6 +83,20 @@ func FileExists(fname string) bool {
   return true
 }
 
+func AssertDir(dirname string) {
+  st, err := os.Stat(dirname)
+  if os.IsNotExist(err) {
+    os.Mkdir(dirname, 0700)
+    return
+  }
+  if st.IsDir() {
+    return
+  } else {
+    os.Remove(dirname)
+    os.Mkdir(dirname, 0700)
+  }
+}
+
 func FormatHash(data []byte) string {
   return strings.ToLower(base32.HexEncoding.EncodeToString(data))
 }
