@@ -91,7 +91,7 @@ func (self *Daemon) HasPeer(peer Peer) bool {
 }
 
 func (self *Daemon) AddPeer(peer Peer) {
-  if peer.Addr == self.Us.Addr {
+  if peer.PubKey == self.Us.PubKey {
     log.Println("not adding self")
     return
   }
