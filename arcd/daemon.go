@@ -103,6 +103,7 @@ func (self *Daemon) AddPeer(peer Peer) {
   for idx := range(self.KnownPeers) {
     if self.KnownPeers[idx].PubKey == "" {
       self.KnownPeers[idx] = peer
+      return
     }
   }
 }
