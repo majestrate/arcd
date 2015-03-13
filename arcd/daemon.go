@@ -91,6 +91,10 @@ func (self *Daemon) AddPeer(peer Peer) {
 }
 
 func (self *Daemon) AddPeerStr(net, addr, pubkey string) {
+  if addr == self.Us.Addr {
+    log.Println("not adding self")
+    return
+  }
   if self.numhubs < uint(len(self.hubs)) {
     log.Println("Add peer", net, addr, pubkey)
     go self.PersistHub(net, addr, pubkey)
