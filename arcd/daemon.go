@@ -389,7 +389,7 @@ func (self *Daemon) Run(ircd *IRCD) {
   log.Println("running hub")
   for {
     counter ++
-    if counter == 0  {
+    if counter % 32 == 0  {
       self.Filter.Decay()
     }
     var msg *ARCMessage
