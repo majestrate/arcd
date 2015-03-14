@@ -313,7 +313,9 @@ func (self *HubHandler) ReadMessages() {
           line := lines[idx]
           var peer Peer
           if peer.Parse(line) {
-            self.daemon.AddPeer(peer)
+            if peer.Net != "ipv6" {
+              self.daemon.AddPeer(peer)
+            }
           }
         }
       }
