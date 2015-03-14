@@ -8,8 +8,7 @@ probably full of bugs, use at own risk
 ### install
 
     go get github.com/majestrate/arcd/arcd
-    git clone github.com/majestrate/arcd
-    cd arcd 
+    cd /where/ever/gopath/is/located/src/github.com/majestrate/arcd 
     make
 ### useage
 
