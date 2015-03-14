@@ -20,5 +20,5 @@ join irc server at ::1 port 6667 after running the following command:
 active channels: 
 
 * #arcnet
-* #benis
+* #benis (off topic channel)
 
