@@ -9,6 +9,7 @@ probably full of bugs, use at own risk
 
 * tor
 * go 1.4
+* irc client
 * a brain
 
 ### obtain
