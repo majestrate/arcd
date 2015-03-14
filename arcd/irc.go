@@ -143,10 +143,14 @@ func parseIRCLine(line string) (source, action, target, message string) {
 
 func (self *IRC) acceptMessage(line string) bool {
   source, action, target, _ := parseIRCLine(line)
+  var nick string
+  if strings.Count(source, "!") > 0 {
+    nick = strings.Split(source, "!")[0]
+  }
+  
   if action == "PRIVMSG" {
     if channelNameValid(target) {
       _, ok := self.channels[target]
-      nick := strings.Split(source, "!")[0]
       return ok && self.Nick != nick
     }
     return target == self.Nick
@@ -154,8 +158,8 @@ func (self *IRC) acceptMessage(line string) bool {
   if action == "JOIN" || action == "PART" {
     if channelNameValid(target) {
       _, ok := self.channels[target]
-      return ok
-    }
+      return ok || self.Nick == nick
+    } 
   }
   return false
 }
@@ -206,7 +210,12 @@ func (self *IRC) ReadMessages() {
         }
       }
     } else if strings.HasPrefix(line, "NICK ") {
-      self.Nick = line[5:]
+      idx := strings.Index(line, ":" )
+      if idx > 0 {
+        self.Nick = line[idx+1:]
+      } else {
+        self.Nick = line[5:]
+      }
       log.Println(self.Nick)
       self.Greet()
     } else {
@@ -244,6 +253,7 @@ func (self *IRC) JoinChannel(chname string) {
   if !ok {
     self.channels[chname] = true
     line := fmt.Sprintf(":%s!user@arcd JOIN :%s", self.Nick, chname)
+    self.Send <- line
     self.Daemon.Broadacst <- NewArcIRCLine(line)
   } else {
     self.SendNum("443", fmt.Sprintf("%s %s", self.Nick, chname), "already on channel")
@@ -278,9 +288,9 @@ func (self *IRC) Motd() {
 
 // greet new user
 func (self *IRC) Greet() {
-  self.SendNum("001", "", self.Nick)
-  self.SendNum("002", "", self.Nick+"!user@arcd")
-  self.SendNum("003", "", "This Server was created sometime")
-  self.SendNum("004", "", "arcd 0.0.1 xbw mb")
+  self.SendNum("001", self.Nick, "Welcome to the Internet Relay Network "+self.Nick+"!user@arcd")
+  self.SendNum("002", self.Nick, "Your host is arcd, running version arcd 0.0.1")
+  self.SendNum("003", self.Nick, "This Server was created sometime")
+  self.SendNum("004", self.Nick, "arcd 0.0.1 xbw mb")
   self.Motd()
 }
