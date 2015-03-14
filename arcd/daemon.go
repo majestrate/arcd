@@ -248,6 +248,7 @@ func (self *HubHandler) ReadMessages() {
       log.Println("filter hit")
       continue
     }
+    self.daemon.Filter.Add(buff)
     log.Println("Got Message of size", msg.MessageLength)
     
     if msg.MessageType == ARC_MESG_TYPE_DHT {
@@ -367,8 +368,6 @@ func (self *Daemon) SendTo(target []byte, msg *ARCMessage) {
 
 func (self *Daemon) got_Broadcast(msg *ARCMessage, ircd *IRCD) {
   ircd.Broadcast <- string(msg.MessageData)
-  buff := msg.Bytes()
-  self.Filter.Add(buff)
   for idx := range(self.hubs) {
     if self.hubs[idx] != nil {
       log.Println("send to hub")
@@ -383,7 +382,7 @@ func (self *Daemon) got_KadMesssage(msg *ARCMessage) {
 
 func (self *Daemon) Run(ircd *IRCD) {
   go self.Accept()
-  var counter uint8
+  var counter byte
   log.Println("running hub")
   for {
     counter ++
