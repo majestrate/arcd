@@ -302,9 +302,11 @@ func (self *HubHandler) ReadMessages() {
           log.Println("hub identified as", FormatHash(hash))
           self.TheirHash = hash
           self.daemon.Kad.Insert(hash)
-        
-          self.Broadacst <- NewArcPeersMessage(self.daemon.KnownPeers)
           
+          msg = NewArcPeersMessage(self.daemon.KnownPeers)
+          if msg.MessageLength > 0 {
+            self.Broadacst <- msg
+          }
         }
       } else {
         peers := msg.GetPayloadString()
