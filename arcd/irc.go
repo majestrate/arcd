@@ -18,32 +18,13 @@ type IRCD struct {
 
 type IRC struct {
   Daemon *Daemon
-  Broadcast chan string
+  Send chan string
   conn net.Conn
   reader *bufio.Reader
   Nick string
+  channels map[string]bool
 }
 
-func (self *IRC) SendLine(data string) {
-  self.Broadcast <- data
-}
-
-func (self *IRC) ReadLine() string {
-  data, err  := self.reader.ReadBytes('\n')
-  if err != nil {
-    return ""
-  }
-  var line string
-  line = string(data[:len(data)-2])
-  log.Println("read ", line)
-  return line
-}
-
-func (self *IRC) Init(conn net.Conn) {
-  self.conn = conn
-  self.reader = bufio.NewReader(self.conn)
-  self.Broadcast = make(chan string, 8)
-}
 
 func (self *IRCD) Init(daemon *Daemon) {
   self.Daemon = daemon
@@ -58,7 +39,7 @@ func (self *IRCD) clientAdd(handler *IRC) {
       return
     }
   }
-  log.Fatal("too many clients connected")
+  log.Println("too many clients connected")
 }
 
 func (self *IRCD) clientRemove(handler *IRC) {
@@ -75,7 +56,9 @@ func (self *IRCD) Run() {
     line := <- self.Broadcast
     for idx := range(self.clients) {
       if self.clients[idx] != nil {
-        self.clients[idx].Broadcast <- line
+        if self.clients[idx].acceptMessage(line) {
+          self.clients[idx].Send <- line
+        }
       }
     }
   }
@@ -108,14 +91,84 @@ func (self *IRCD) InboundIRC(conn net.Conn) {
   self.clientRemove(&irc)
 }
 
+func (self *IRC) Init(conn net.Conn) {
+  self.conn = conn
+  self.reader = bufio.NewReader(self.conn)
+  self.Send = make(chan string, 8)
+  self.channels = make(map[string]bool)
+}
+
+func (self *IRC) SendLine(data string) {
+  self.Send <- data
+}
+
+func (self *IRC) ReadLine() string {
+  data, err  := self.reader.ReadBytes('\n')
+  if err != nil {
+    return ""
+  }
+  var line string
+  line = string(data[:len(data)-2])
+  log.Println("read ", line)
+  return line
+}
+
+func (self *IRC) end() {
+  self.conn.Close() 
+}
+
+func parseIRCLine(line string) (source, action, target, message string) {
+  if ! strings.HasPrefix(line, ":") {
+    return 
+  }
+  parts := strings.Split(line, " ")
+  if len(parts) < 3 {
+    return 
+  }
+  
+  if len(parts) >= 4 {
+    idx := strings.Index(parts[3], ":")
+    if idx == -1 {
+      return 
+    }
+    message = line[idx+1:]
+  }
+
+  source = parts[0][1:]
+  action = strings.ToUpper(parts[1])
+  target = parts[2]
+  
+  return
+}
+
+func (self *IRC) acceptMessage(line string) bool {
+  source, action, target, _ := parseIRCLine(line)
+  if action == "PRIVMSG" {
+    if channelNameValid(target) {
+      _, ok := self.channels[target]
+      nick := strings.Split(source, "!")[0]
+      return ok && self.Nick != nick
+    }
+    return target == self.Nick
+  }
+  if action == "JOIN" || action == "PART" {
+    if channelNameValid(target) {
+      _, ok := self.channels[target]
+      return ok
+    }
+  }
+  return false
+}
+
 func (self *IRC) WriteMessages() {
   for {
-    line := <- self.Broadcast
+    line := <- self.Send
     log.Println("write ", line)
     buff := bytes.NewBufferString(line)
     buff.WriteString("\n")
     _, err := self.conn.Write(buff.Bytes())
     if err != nil {
+      self.end()
       break
     }
   }
@@ -125,10 +178,15 @@ func (self *IRC) ReadMessages() {
   for {
     line := self.ReadLine()
     if line == "" {
+      self.end()
       break
     }
     if strings.HasPrefix(line, "PING ") {
-      line := ":arcd PONG :"+ line[5:]
+      if line[5] == ':' {
+        line = ":arcd PONG " + line[5:]
+      } else {
+        line = ":arcd PONG :" + line[5:]
+      }
       self.SendLine(line)
       continue
     }
@@ -136,34 +194,93 @@ func (self *IRC) ReadMessages() {
       if strings.HasPrefix(line , "PRIVMSG ") {
         ircline := fmt.Sprintf(":%s!user@arcd %s", self.Nick, line)
         self.Daemon.Broadacst <- NewArcIRCLine(ircline)
+      } else if strings.HasPrefix(line, "JOIN ") {
+        chans := strings.Split(line[5:], ",")
+        for idx := range(chans) {
+          self.JoinChannel(chans[idx])
+        }
+      } else if strings.HasPrefix(line, "PART ") {
+        chans := strings.Split(line[5:], ",") 
+        for idx := range(chans) {
+          self.PartChannel(chans[idx])
+        }
       }
-      
-      
     } else if strings.HasPrefix(line, "NICK ") {
       self.Nick = line[5:]
+      log.Println(self.Nick)
       self.Greet()
-      self.JoinDefaultChannel()
+    } else {
+      log.Println(line)
     }
   }
 }
 
-func (self *IRC) JoinDefaultChannel() {
-  self.SendLine(":"+self.Nick+"!user@arcd JOIN :#arcnet")
+func (self *IRC) SendNum(num, target, data string) {
+  var line string
+  if target == "" {
+    line = fmt.Sprintf(":arcd %s :%s", num, data)
+  } else {
+    line = fmt.Sprintf(":arcd %s %s :%s", num, target, data)
+  }
+  self.SendLine(line)
+}
+
+func channelNameValid(name string) bool {
+  if ! strings.HasPrefix(name, "#")  {
+    return false
+  }
+  if strings.Contains(name, " ") {
+    return false
+  }
+  return true
+}
+
+func (self *IRC) JoinChannel(chname string) {
+  if ! channelNameValid(chname) {
+    self.SendNum("403", chname ,"No such channel")
+    return
+  } 
+  _, ok := self.channels[chname]
+  if !ok {
+    self.channels[chname] = true
+    line := fmt.Sprintf(":%s!user@arcd JOIN :%s", self.Nick, chname)
+    self.Daemon.Broadacst <- NewArcIRCLine(line)
+  } else {
+    self.SendNum("443", fmt.Sprintf("%s %s", self.Nick, chname), "already on channel")
+  }
+
+}
+
+func (self *IRC) PartChannel(chname string) {
+  if ! channelNameValid(chname) {
+    self.SendNum("403", chname ,"No such channel")
+    return
+  } 
+  var put bool
+  _, ok := self.channels[chname]
+  if ok {
+    delete(self.channels, chname)
+    put = true
+  }
+  if put {
+    line := fmt.Sprintf(":%s!user@arcd PART :%s", self.Nick, chname)
+    self.Daemon.Broadacst <- NewArcIRCLine(line)
+  } else {
+    self.SendNum("442", chname, "you are not on that channel")
+  }
 }
 
 func (self *IRC) Motd() {
-  
-  self.SendLine(":arcd 375 "+self.Nick+" :- arcd MOTD")
-  self.SendLine(":arcd 372 "+self.Nick+" :- benis")
-  self.SendLine(":arcd 376 "+self.Nick+" :RPL_ENDOFMOTD")
+  self.SendNum("375", self.Nick, "- arcd MOTD")
+  self.SendNum("372", self.Nick, "- benis")
+  self.SendNum("376", self.Nick, "- RPL_ENDOFMOTD")
 }
 
 // greet new user
 func (self *IRC) Greet() {
-  self.SendLine("001 :"+self.Nick)
-  self.SendLine("002 :"+self.Nick+"!user@arcd")
-  self.SendLine("003 :arcd")
-  self.SendLine("004 arcd 0.0 :+")
-  self.SendLine("005 NETWORK=ARCNET CHANTYPES=#&!+ CASEMAPPING=ascii CHANLIMIT=25 NICKLEN=25 TOPICLEN=128 CHANNELLEN=16 COLOUR=1 UNICODE=1 PRESENCE=0:")
+  self.SendNum("001", "", self.Nick)
+  self.SendNum("002", "", self.Nick+"!user@arcd")
+  self.SendNum("003", "", "This Server was created sometime")
+  self.SendNum("004", "", "arcd 0.0.1 xbw mb")
   self.Motd()
 }
