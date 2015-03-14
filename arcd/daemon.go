@@ -320,26 +320,9 @@ func (self *HubHandler) ReadMessages() {
           log.Println("hub identified as", FormatHash(hash))
           self.TheirHash = hash
           self.daemon.Kad.Insert(hash)
-          msg = NewArcPeersMessage(self.daemon.GetPeers(8))
-          if msg.MessageLength > 0 {
-           self.Broadacst <- msg
-          }
         } else {
           log.Println("hub failed to identify")
           self.conn.Close()
-        }
-        
-      } else {
-        peers := msg.GetPayloadString()
-        lines := strings.Split(peers, "\n")
-        for idx := range(lines) {
-          line := lines[idx]
-          var peer Peer
-          if peer.Parse(line) {
-            if peer.Net != "ipv6" {
-              self.daemon.AddPeer(peer)
-            }
-          }
         }
       }
     }

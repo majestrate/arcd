@@ -136,7 +136,9 @@ func (self *ARCMessage) Verify(pubkey *ecdsa.PublicKey) bool {
 }
 
 func (self *ARCMessage) GetPeer() Peer {
-  data := self.MessageData[:len(self.MessageData)-int(ARC_SIG_LEN)]
+  idx := len(self.MessageData)-int(ARC_SIG_LEN)
+  log.Println(idx)
+  data := self.MessageData[:idx]
   var peer Peer
   if ! peer.Parse(string(data)) {
     log.Println("invalid peer data", string(data))

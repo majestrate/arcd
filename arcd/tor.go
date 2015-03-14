@@ -50,5 +50,5 @@ func (self *TorProc) GetOnion() string {
   if err != nil {
     return ""
   }
-  return string(data)
+  return string(data[:len(data)-1])
 }
