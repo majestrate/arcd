@@ -178,7 +178,7 @@ func (self *Daemon) connectForNet(network, addr string) (net.Conn, error) {
     }
     return conn, nil
   }
-  return net.Dial("tcp6", addr)
+  return net.Dial("tcp6", "")
 }
 
 func (self *Daemon) PersistHub(network, addr, pubkey string) {
@@ -240,6 +240,7 @@ func (self *Daemon) GetPeers(maxnum int) []Peer {
       }
     }
   }
+  peers[0] = self.Us
   return peers
 }
 
@@ -325,6 +326,7 @@ func (self *HubHandler) ReadMessages() {
           }
         } else {
           log.Println("hub failed to identify")
+          self.conn.Close()
         }
         
       } else {
