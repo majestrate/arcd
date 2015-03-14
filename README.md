@@ -5,16 +5,34 @@
 
 probably full of bugs, use at own risk
 
-### install
+### dependancies
 
+* tor
+* go 1.4
+* a brain
+
+### obtain
+
+    export GOPATH=$HOME/git
+    mkdir -p $HOME/git
     go get github.com/majestrate/arcd/arcd
-    cd /where/ever/gopath/is/located/src/github.com/majestrate/arcd 
+    
+### compile
+
+    cd $HOME/git/src/github.com/majestrate/arcd 
     make
+
+### update
+
+    cd $HOME/git/src/github.com/majestrate/arcd
+    git pull 
+    make 
+
 ### useage
 
 join irc server at ::1 port 6667 after running the following command:
 
-    ./arcd.bin 
+    ./arcd.bin
 
 active channels: 
 
