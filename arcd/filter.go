@@ -17,7 +17,6 @@ func (self *DecayingBloomFilter) Init() {
 }
 
 func (self *DecayingBloomFilter) Decay() {
-  self.array = nil
   self.array = make(map[uint64] bool)
 }
 
