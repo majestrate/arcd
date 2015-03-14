@@ -385,7 +385,7 @@ func (self *Daemon) got_KadMesssage(msg *ARCMessage) {
 
 func (self *Daemon) Run(ircd *IRCD) {
   go self.Accept()
-  var counter byte
+  var counter uint16
   log.Println("running hub")
   for {
     counter ++
