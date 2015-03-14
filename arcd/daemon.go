@@ -313,22 +313,20 @@ func (self *HubHandler) ReadMessages() {
       if self.TheirHash == nil {
         verified := msg.VerifyIdentity() 
         if verified {
-          
-          peerline := msg.GetPayloadString()
-          if self.them.Parse(peerline) {
-            pubkey := msg.GetPubKey()
-            hash := ECC_256_KeyHash(pubkey)
-            log.Println("hub identified as", FormatHash(hash))
-            self.TheirHash = hash
-            self.daemon.Kad.Insert(hash)
-            msg = NewArcPeersMessage(self.daemon.GetPeers(8))
-          } else {
-            log.Println("hub failed to identify")
-          }
+          self.them = msg.GetPeer()
+          pubkey := ECC_256_UnPackPubKeyString(self.them.PubKey)
+          hash := ECC_256_KeyHash(pubkey)
+          log.Println("hub identified as", FormatHash(hash))
+          self.TheirHash = hash
+          self.daemon.Kad.Insert(hash)
+          msg = NewArcPeersMessage(self.daemon.GetPeers(8))
           if msg.MessageLength > 0 {
-            self.Broadacst <- msg
+           self.Broadacst <- msg
           }
+        } else {
+          log.Println("hub failed to identify")
         }
+        
       } else {
         peers := msg.GetPayloadString()
         lines := strings.Split(peers, "\n")

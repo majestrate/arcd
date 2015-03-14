@@ -135,19 +135,17 @@ func (self *ARCMessage) Verify(pubkey *ecdsa.PublicKey) bool {
   return VerifyECC_256(buff, sig, pubkey)
 }
 
-func (self *ARCMessage) GetPubKey() ecdsa.PublicKey {
+func (self *ARCMessage) GetPeer() Peer {
   data := self.MessageData[:len(self.MessageData)-int(ARC_SIG_LEN)]
   var peer Peer
   if ! peer.Parse(string(data)) {
     log.Println("invalid peer data", string(data))
-    var dummy ecdsa.PublicKey
-    return dummy
   }
-  return ECC_256_UnPackPubKeyString(peer.PubKey)
+  return peer
 }
 
 func (self *ARCMessage) VerifyIdentity() bool {
-  pubkey := self.GetPubKey()
+  pubkey := ECC_256_UnPackPubKeyString(self.GetPeer().PubKey)
   return self.Verify(&pubkey)
 }
 
