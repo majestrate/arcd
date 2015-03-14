@@ -218,7 +218,7 @@ func (self *IRC) ReadMessages() {
 func (self *IRC) SendNum(num, target, data string) {
   var line string
   if target == "" {
-    line = fmt.Sprintf(":arcd %s :%s", num, data)
+    line = fmt.Sprintf(":arcd %s %s", num, data)
   } else {
     line = fmt.Sprintf(":arcd %s %s :%s", num, target, data)
   }
