@@ -11,4 +11,14 @@ probably full of bugs, use at own risk
     git clone github.com/majestrate/arcd
     cd arcd 
     make
-    ./arcd.bin
+### useage
+
+join irc server at ::1 port 6667 after running the following command:
+
+    ./arcd.bin 
+
+active channels: 
+
+* #arcnet
+* #benis
+
