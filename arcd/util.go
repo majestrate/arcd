@@ -69,7 +69,7 @@ func SHA1AsUInt64(data []byte) uint64 {
   digest := sha1.Sum(data)
   var retval uint64
   retval = 0
-  for idx := 0 ; idx < 20 ; idx ++ {
+  for idx := 0 ; idx < 16 ; idx ++ {
     retval = retval | uint64(digest[idx] << uint(idx * 8))
   }
   return retval

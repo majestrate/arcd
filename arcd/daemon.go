@@ -31,6 +31,7 @@ type HubHandler struct {
   daemon *Daemon
   Broadacst chan *ARCMessage
   TheirHash []byte
+  them Peer
   KadTries map[string][][]byte // key = target, val = keys tried
 }
 
@@ -228,6 +229,20 @@ func (self *Daemon) hubRemove(handler *HubHandler) {
   }
 }
 
+func (self *Daemon) GetPeers(maxnum int) []Peer {
+  peers := make([]Peer, maxnum)
+  for idx := range(self.hubs) {
+    handler := self.hubs[idx] 
+    if handler != nil {
+      if handler.them.PubKey != "" {
+        peers[maxnum-1] = handler.them
+        maxnum --;
+      }
+    }
+  }
+  return peers
+}
+
 func (self *HubHandler) SendIdent() {
   msg := NewArcIdentityMessage(self.daemon.Us, self.daemon.PrivKey)
   self.Broadacst <- msg
@@ -298,13 +313,18 @@ func (self *HubHandler) ReadMessages() {
       if self.TheirHash == nil {
         verified := msg.VerifyIdentity() 
         if verified {
-          pubkey := msg.GetPubKey()
-          hash := ECC_256_KeyHash(pubkey)
-          log.Println("hub identified as", FormatHash(hash))
-          self.TheirHash = hash
-          self.daemon.Kad.Insert(hash)
           
-          msg = NewArcPeersMessage(self.daemon.KnownPeers)
+          peerline := msg.GetPayloadString()
+          if self.them.Parse(peerline) {
+            pubkey := msg.GetPubKey()
+            hash := ECC_256_KeyHash(pubkey)
+            log.Println("hub identified as", FormatHash(hash))
+            self.TheirHash = hash
+            self.daemon.Kad.Insert(hash)
+            msg = NewArcPeersMessage(self.daemon.GetPeers(8))
+          } else {
+            log.Println("hub failed to identify")
+          }
           if msg.MessageLength > 0 {
             self.Broadacst <- msg
           }
