@@ -70,7 +70,7 @@ func SHA1AsUInt64(data []byte) uint64 {
   var retval uint64
   retval = 0
   for idx := 0 ; idx < 16 ; idx ++ {
-    retval = retval | uint64(digest[idx] << uint(idx * 8))
+    retval = retval | uint64(digest[idx]) << uint(idx * 8)
   }
   return retval
 }
