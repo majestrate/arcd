@@ -4,8 +4,8 @@ import (
   "bytes"
   //"crypto/rsa"
   "crypto/ecdsa"
+  "io"
   "log"
-  "net"
 )
 
 const ARC_HASH_LEN uint = 32
@@ -39,10 +39,10 @@ type ARCMessage struct {
   MessageData []byte
 }
 
-func ReadARCMessage(reader net.Conn) *ARCMessage {
+func ReadARCMessage(reader io.Reader) *ARCMessage {
   var hdr []byte
   hdr = make([]byte, ARC_HEADER_LEN)
-  red, err := reader.Read(hdr)
+  red, err := io.ReadFull(reader, hdr)
   if err != nil {
     return nil
   }
@@ -63,7 +63,7 @@ func ReadARCMessage(reader net.Conn) *ARCMessage {
     mesg.MessageData = make([]byte, mlen)
     log.Println("len=", mlen)
     log.Println("len=", len(mesg.MessageData))
-    red, err = reader.Read(mesg.MessageData)
+    red, err = io.ReadFull(reader, mesg.MessageData)
     if err != nil {
       log.Println("failed to read arc message payload of size", mesg.MessageLength)
       return nil
