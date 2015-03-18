@@ -42,7 +42,7 @@ type ARCMessage struct {
 func ReadARCMessage(reader io.Reader) *ARCMessage {
   var hdr []byte
   hdr = make([]byte, ARC_HEADER_LEN)
-  red, err := io.ReadFull(reader, hdr)
+  _, err := io.ReadFull(reader, hdr)
   if err != nil {
     return nil
   }
@@ -61,14 +61,11 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
     mlen = mesg.MessageLength
     
     mesg.MessageData = make([]byte, mlen)
-    log.Println("len=", mlen)
-    log.Println("len=", len(mesg.MessageData))
-    red, err = io.ReadFull(reader, mesg.MessageData)
+    _, err = io.ReadFull(reader, mesg.MessageData)
     if err != nil {
       log.Println("failed to read arc message payload of size", mesg.MessageLength)
       return nil
     }
-    log.Println("read ", red)
     return mesg
   } else {
     log.Println("invalid protocol number", hdr[0])
@@ -89,16 +86,12 @@ func (self *ARCMessage) StampTime() {
 
 func (self *ARCMessage) SetPayload(data []byte) {
   self.MessageLength = uint16(len(data))
-  log.Println("set payload of size", self.MessageLength)
   self.MessageData = make([]byte,  self.MessageLength)
   copybytes(self.MessageData, data, 0, 0, uint(len(data)))
-  log.Println("pay is", len(self.MessageData))
-  
 }
 
 func (self *ARCMessage) Bytes() []byte {
   bufflen := ARC_HEADER_LEN + uint(self.MessageLength)
-  log.Println(bufflen)
   buff :=  make([]byte, bufflen)
   // make header
   buff[0] = self.ProtocolByte
@@ -109,7 +102,6 @@ func (self *ARCMessage) Bytes() []byte {
   putlong(self.MessageTime, buff, (ARC_HASH_LEN * 2)+ 2 + 2 + 1)
   var mlen uint
   mlen = uint(self.MessageLength)
-  log.Println(mlen)
   copybytes(buff, self.MessageData, ARC_HEADER_LEN, 0, mlen)
   return buff
 }
