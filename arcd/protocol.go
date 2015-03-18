@@ -51,7 +51,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
   // protocol zero
   if hdr[0] == ARC_PROTOCOL_NUM {
     mesg.Init(0)
-    mesg.ProtocolByte = ARC_PROTOCOL_NUM
+    mesg.ProtocolByte = hdr[0]
     copybytes(mesg.SourceHash, hdr, 0, 1, ARC_HASH_LEN)
     copybytes(mesg.DestHash, hdr, 0, 1 + ARC_HASH_LEN, ARC_HASH_LEN)
     mesg.MessageType = getshort(hdr, 1 + (ARC_HASH_LEN * 2))
@@ -85,7 +85,7 @@ func (self *ARCMessage) SetPayload(data []byte) {
   self.MessageLength = uint16(len(data))
   log.Println("set payload of size", self.MessageLength)
   self.MessageData = make([]byte,  self.MessageLength)
-  copybytes(self.MessageData, data, 0, 0, uint(self.MessageLength))
+  copybytes(self.MessageData, data, 0, 0, uint(len(data)))
   log.Println("pay is", len(self.MessageData))
   
 }
