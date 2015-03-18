@@ -23,9 +23,11 @@ const (
 )
 
 
+const ARC_PROTOCOL_NUM uint8 = 0x02
+
 type ARCMessage struct {
   // begin header
-  ProtocolByte uint8 // right now it's 0x01
+  ProtocolByte uint8 
   // for dht
   SourceHash []byte
   DestHash []byte
@@ -47,7 +49,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
   mesg := new(ARCMessage)
   mesg.Init(0)
   // protocol zero
-  if hdr[0] == 1 {
+  if hdr[0] == ARC_PROTOCOL_NUM {
     mesg.ProtocolByte = hdr[0]
     copybytes(mesg.SourceHash, hdr, 0, 1, ARC_HASH_LEN)
     copybytes(mesg.DestHash, hdr, 0, 1 + ARC_HASH_LEN, ARC_HASH_LEN)
@@ -68,7 +70,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
 }
 
 func (self *ARCMessage) Init(mtype uint16) {
-  self.ProtocolByte = 1
+  self.ProtocolByte = ARC_PROTOCOL_NUM
   self.SourceHash = make([]byte, ARC_HASH_LEN)
   self.DestHash = make([]byte, ARC_HASH_LEN)
   self.MessageType = mtype
