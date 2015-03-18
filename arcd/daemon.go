@@ -15,7 +15,6 @@ type Daemon struct {
   Listener *net.TCPListener
   Broadacst chan *ARCMessage
   KadMessage chan *ARCMessage
-  Filter DecayingBloomFilter
   Kad RoutingTable
   torproc *TorProc
   Us Peer
@@ -33,6 +32,7 @@ type HubHandler struct {
   TheirHash []byte
   them Peer
   KadTries map[string][][]byte // key = target, val = keys tried
+  Filter DecayingBloomFilter
 }
 
 func (self *HubHandler) Init(daemon *Daemon, conn net.Conn) {
@@ -40,6 +40,7 @@ func (self *HubHandler) Init(daemon *Daemon, conn net.Conn) {
   self.conn = conn
   self.Broadacst = make(chan *ARCMessage, 24)
   daemon.hubAdd(self)
+  self.Filter.Init() 
 }
 
 func (self *Daemon) Init() {
@@ -64,7 +65,6 @@ func (self *Daemon) Init() {
   self.Kad.Init()
   self.Broadacst = make(chan *ARCMessage, 24)
   self.KadMessage = make(chan *ARCMessage, 24)
-  self.Filter.Init() 
   self.hubs = make([]*HubHandler, 128)
   self.KnownPeers = make([]Peer, 128)
 
@@ -260,10 +260,11 @@ func (self *HubHandler) ReadMessages() {
       return
     }
     buff := msg.Bytes()
-    if self.daemon.Filter.Contains(buff) {
+    if self.Filter.Contains(buff) {
       log.Println("filter hit")
       continue
     }
+    self.Filter.Add(buff)
     log.Println("Got Message of size", msg.MessageLength)
     
     if msg.MessageType == ARC_MESG_TYPE_DHT {
@@ -344,6 +345,7 @@ func (self *HubHandler) WriteMessages() {
     msg := <- self.Broadacst 
     log.Println("hub write message")
     buff := msg.Bytes()
+    self.Filter.Add(buff)
     _, err := self.conn.Write(buff)
     if err != nil {
       log.Println("Failed to write message", err)
@@ -370,7 +372,6 @@ func (self *Daemon) SendTo(target []byte, msg *ARCMessage) {
 
 func (self *Daemon) got_Broadcast(msg *ARCMessage, ircd *IRCD) {
   ircd.Broadcast <- string(msg.MessageData)
-  self.Filter.Add(msg.Bytes())
   for idx := range(self.hubs) {
     if self.hubs[idx] != nil {
       log.Println("send to hub")
@@ -385,13 +386,8 @@ func (self *Daemon) got_KadMesssage(msg *ARCMessage) {
 
 func (self *Daemon) Run(ircd *IRCD) {
   go self.Accept()
-  var counter uint16
   log.Println("running hub")
   for {
-    counter ++
-    if counter % 32 == 0  {
-      self.Filter.Decay()
-    }
     var msg *ARCMessage
     select {
       case msg = <- self.Broadacst:
