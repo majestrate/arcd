@@ -57,7 +57,12 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
     mesg.MessageType = getshort(hdr, 1 + (ARC_HASH_LEN * 2))
     mesg.MessageLength = getshort(hdr, 1 + 2 + (ARC_HASH_LEN * 2))
     mesg.MessageTime = getlong(hdr, 1 + 2 + 2 + (ARC_HASH_LEN * 2))
-    mesg.MessageData = make([]byte, int(mesg.MessageLength))
+    var mlen uint16
+    mlen = mesg.MessageLength
+    
+    mesg.MessageData = make([]byte, mlen)
+    log.Println("len=", mlen)
+    log.Println("len=", len(mesg.MessageData))
     _, err = reader.Read(mesg.MessageData)
     if err != nil {
       log.Println("failed to read arc message payload of size", mesg.MessageLength)
