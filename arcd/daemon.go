@@ -346,13 +346,14 @@ func (self *HubHandler) WriteMessages() {
     log.Println("hub write message")
     buff := msg.Bytes()
     self.Filter.Add(buff)
-    _, err := self.conn.Write(buff)
+    wr, err := self.conn.Write(buff)
     if err != nil {
       log.Println("Failed to write message", err)
       self.conn.Close()
       self.daemon.hubRemove(self)
       return
     }
+    log.Println("wrote", wr)
   }
 }
 
