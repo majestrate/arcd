@@ -33,15 +33,4 @@ func (self *DecayingBloomFilter) Add(data []byte) {
 func (self *DecayingBloomFilter) Contains(data []byte) bool {
   idx := SHA1AsUInt64(data) 
   return self.array[idx] 
-  /*
-  probes := self.get_probes(data)
-  for idx := range(probes) {
-    i := probes[idx]
-    i2 := uint( i  % 8 )
-    if self.array[i / 8] & byte( math.Pow( 2.0, float64(i2) ) ) != 0 {
-      return true
-    }
-  }
-  return false
-  */
 }
