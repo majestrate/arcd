@@ -10,7 +10,7 @@ import (
 
 const ARC_HASH_LEN uint = 32
 const ARC_SIG_LEN uint = 64
-const ARC_HEADER_LEN uint16 = uint16(ARC_HASH_LEN * 2 + 2 + 2 + 8 + 1)
+const ARC_HEADER_LEN uint16 = uint16((ARC_HASH_LEN * 2) + 2 + 2 + 8 + 1)
 const (
   // control message
   ARC_MESG_TYPE_CTL = iota +1
@@ -57,7 +57,7 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
     mesg.MessageType = getshort(hdr, 1 + (ARC_HASH_LEN * 2))
     mesg.MessageLength = getshort(hdr, 1 + 2 + (ARC_HASH_LEN * 2))
     mesg.MessageTime = getlong(hdr, 1 + 2 + 2 + (ARC_HASH_LEN * 2))
-    mesg.MessageData = make([]byte, mesg.MessageLength)
+    mesg.MessageData = make([]byte, int(mesg.MessageLength))
     _, err = reader.Read(mesg.MessageData)
     if err != nil {
       log.Println("failed to read arc message payload of size", mesg.MessageLength)
