@@ -97,6 +97,7 @@ func (self *ARCMessage) SetPayload(data []byte) {
 
 func (self *ARCMessage) Bytes() []byte {
   bufflen := uint(ARC_HEADER_LEN + self.MessageLength)
+  log.Println(bufflen)
   buff :=  make([]byte, bufflen)
   // make header
   buff[0] = self.ProtocolByte
