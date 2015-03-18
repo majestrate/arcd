@@ -18,16 +18,17 @@ func copybytes(dst, src []byte, doff, soff, count uint) {
 
 func getshort(buff []byte, off uint) uint16 {
   var retval uint16
-  retval = uint16(buff[off])
-  return retval | uint16( buff[1+off]) << 8 
+  retval = uint16(buff[0+off])
+  retval = retval | uint16( buff[1+off]) << 8 
+  return retval
 }
 
 func putshort(num uint16, buff []byte, off uint) {
   var n uint16
   n = ( 0xff00 & num ) >> 8
-  buff[off+1] = byte(n)
+  buff[off+0] = byte(n)
   n = ( 0x00ff & num )
-  buff[off] = byte(n) 
+  buff[off+1] = byte(n) 
 }
 
 func getlong(buff []byte, off uint) uint64 {

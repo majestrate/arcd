@@ -47,10 +47,11 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
     return nil
   }
   mesg := new(ARCMessage)
-  mesg.Init(0)
+  
   // protocol zero
   if hdr[0] == ARC_PROTOCOL_NUM {
-    mesg.ProtocolByte = hdr[0]
+    mesg.Init(0)
+    mesg.ProtocolByte = ARC_PROTOCOL_NUM
     copybytes(mesg.SourceHash, hdr, 0, 1, ARC_HASH_LEN)
     copybytes(mesg.DestHash, hdr, 0, 1 + ARC_HASH_LEN, ARC_HASH_LEN)
     mesg.MessageType = getshort(hdr, 1 + (ARC_HASH_LEN * 2))
