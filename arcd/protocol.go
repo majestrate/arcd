@@ -4,8 +4,8 @@ import (
   "bytes"
   //"crypto/rsa"
   "crypto/ecdsa"
-  "io"
   "log"
+  "net"
 )
 
 const ARC_HASH_LEN uint = 32
@@ -39,7 +39,7 @@ type ARCMessage struct {
   MessageData []byte
 }
 
-func ReadARCMessage(reader io.Reader) *ARCMessage {
+func ReadARCMessage(reader net.Conn) *ARCMessage {
   var hdr []byte
   hdr = make([]byte, ARC_HEADER_LEN)
   red, err := reader.Read(hdr)
