@@ -42,7 +42,7 @@ type ARCMessage struct {
 func ReadARCMessage(reader io.Reader) *ARCMessage {
   var hdr []byte
   hdr = make([]byte, ARC_HEADER_LEN)
-  _, err := reader.Read(hdr)
+  red, err := reader.Read(hdr)
   if err != nil {
     return nil
   }
@@ -63,11 +63,12 @@ func ReadARCMessage(reader io.Reader) *ARCMessage {
     mesg.MessageData = make([]byte, mlen)
     log.Println("len=", mlen)
     log.Println("len=", len(mesg.MessageData))
-    _, err = reader.Read(mesg.MessageData)
+    red, err = reader.Read(mesg.MessageData)
     if err != nil {
       log.Println("failed to read arc message payload of size", mesg.MessageLength)
       return nil
     }
+    log.Println("read ", red)
     return mesg
   } else {
     log.Println("invalid protocol number", hdr[0])
