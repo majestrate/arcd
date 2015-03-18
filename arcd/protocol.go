@@ -23,7 +23,7 @@ const (
 )
 
 
-const ARC_PROTOCOL_NUM uint8 = 0x02
+const ARC_PROTOCOL_NUM uint8 = 0x03
 
 type ARCMessage struct {
   // begin header
