@@ -10,7 +10,7 @@ import (
 
 const ARC_HASH_LEN uint = 32
 const ARC_SIG_LEN uint = 64
-const ARC_HEADER_LEN uint16 = uint16((ARC_HASH_LEN * 2) + 2 + 2 + 8 + 1)
+const ARC_HEADER_LEN uint = uint((ARC_HASH_LEN * 2) + 2 + 2 + 8 + 1)
 const (
   // control message
   ARC_MESG_TYPE_CTL = iota +1
@@ -96,7 +96,7 @@ func (self *ARCMessage) SetPayload(data []byte) {
 }
 
 func (self *ARCMessage) Bytes() []byte {
-  bufflen := uint(ARC_HEADER_LEN + self.MessageLength)
+  bufflen := ARC_HEADER_LEN + uint(self.MessageLength)
   log.Println(bufflen)
   buff :=  make([]byte, bufflen)
   // make header
@@ -106,7 +106,10 @@ func (self *ARCMessage) Bytes() []byte {
   putshort(self.MessageType, buff, (ARC_HASH_LEN * 2) + 1)
   putshort(self.MessageLength, buff, (ARC_HASH_LEN * 2) + 2 + 1)
   putlong(self.MessageTime, buff, (ARC_HASH_LEN * 2)+ 2 + 2 + 1)
-  copybytes(buff, self.MessageData, uint(ARC_HEADER_LEN), 0, uint(self.MessageLength))
+  var mlen uint
+  mlen = uint(self.MessageLength)
+  log.Println(mlen)
+  copybytes(buff, self.MessageData, ARC_HEADER_LEN, 0, mlen)
   return buff
 }
 
