@@ -23,8 +23,11 @@ func getshort(buff []byte, off uint) uint16 {
 }
 
 func putshort(num uint16, buff []byte, off uint) {
-  buff[off+1] = byte(num) >> 8
-  buff[off] = byte(num) & 0xff
+  var n uint16
+  n = ( 0xff00 & num ) >> 8
+  buff[off+1] = byte(n)
+  n = ( 0x00ff & num )
+  buff[off] = byte(n) 
 }
 
 func getlong(buff []byte, off uint) uint64 {
