@@ -121,11 +121,11 @@ func (self *Daemon) AddPeerStr(net, addr, pubkey string) {
 func (self *Daemon) Bind(addr string, socksport int) error {
   var err error
   var netaddr *net.TCPAddr
-  netaddr, err = net.ResolveTCPAddr("tcp6", addr)
+  netaddr, err = net.ResolveTCPAddr("tcp", addr)
   if err != nil {
     return err
   }
-  self.Listener, err = net.ListenTCP("tcp6", netaddr)
+  self.Listener, err = net.ListenTCP("tcp", netaddr)
   
   if err != nil {
     return err
@@ -302,7 +302,8 @@ func (self *HubHandler) ReadMessages() {
         closest := self.daemon.Kad.GetClosestPeerNotMe(peerHash)
         // we don't have any closest peers?
         if closest == nil {
-          self.Broadacst <- NewArcKADMessage(peerHash, "NACK")
+          kmsg := NewDHTMessage("NACK")
+          self.Broadacst <- NewArcKADMessage(peerHash, kmsg)
         } else {
           log.Println("relay kad message to", FormatHash(closest))
           self.daemon.SendTo(closest, msg)

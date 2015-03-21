@@ -208,14 +208,12 @@ func NewArcPeersMessage(peers []Peer) *ARCMessage {
 }
 
 
-func NewArcKADMessage(target []byte, data string) *ARCMessage {
+func NewArcKADMessage(target []byte, dmsg *DHTMessage) *ARCMessage {
   msg := new(ARCMessage)
   msg.Init(ARC_MESG_TYPE_DHT)
   l := len(target)
   copybytes(msg.DestHash, target, 0, 0, uint(l))
-  var buff bytes.Buffer
-  buff.WriteString(data)
-  msg.SetPayload(buff.Bytes())
+  msg.SetPayload(dmsg.Bytes())
   msg.StampTime()
   return msg
 }
