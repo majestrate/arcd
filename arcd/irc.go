@@ -142,7 +142,7 @@ func parseIRCLine(line string) (source, action, target, message string) {
 }
 
 func (self *IRC) acceptMessage(line string) bool {
-  source, action, target, _ := parseIRCLine(line)
+  source, action, target, message := parseIRCLine(line)
   var nick string
   if strings.Count(source, "!") > 0 {
     nick = strings.Split(source, "!")[0]
@@ -156,9 +156,9 @@ func (self *IRC) acceptMessage(line string) bool {
     return target == self.Nick
   }
   if action == "JOIN" || action == "PART" {
-    if channelNameValid(target) {
-      _, ok := self.channels[target]
-      return ok //|| self.Nick == nick
+    if channelNameValid(message) {
+      _, ok := self.channels[message]
+      return ok 
     } 
   }
   return false
@@ -252,7 +252,7 @@ func (self *IRC) JoinChannel(chname string) {
   _, ok := self.channels[chname]
   if !ok {
     self.channels[chname] = true
-    line := fmt.Sprintf(":%s!user@arcd JOIN :%s", self.Nick, chname)
+    line := fmt.Sprintf(":%s!user@arcd JOIN %s", self.Nick, chname)
     self.Send <- line
     self.Daemon.Broadacst <- NewArcIRCLine(line)
   } else {
