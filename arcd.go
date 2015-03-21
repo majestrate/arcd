@@ -34,7 +34,7 @@ func main() {
   go daemon.LoadPeers(*peers)
   go daemon.Run(&ircd)
   go ircd.Run()
-  
+  defer daemon.Tor.Stop()
   
   // do pings as needed
   for {

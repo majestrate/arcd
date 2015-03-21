@@ -16,7 +16,7 @@ type Daemon struct {
   Broadacst chan *ARCMessage
   KadMessage chan *ARCMessage
   Kad RoutingTable
-  torproc *TorProc
+  Tor *TorProc
   Us Peer
   PrivKey *ecdsa.PrivateKey
   PeerLoader PeerFileLoader
@@ -135,10 +135,10 @@ func (self *Daemon) Bind(addr string, socksport int) error {
   
   
   // spawn tor
-  self.torproc = SpawnTor(socksport)
-  self.torproc.Start()
-  time.Sleep(time.Second)
-  onion := self.torproc.GetOnion()
+  self.Tor = SpawnTor(socksport)
+  self.Tor.Start()
+  time.Sleep(time.Second * 3)
+  onion := self.Tor.GetOnion()
   // load / run daeoms
   
   self.Us.Net = "tor"
@@ -153,7 +153,7 @@ func (self *Daemon) connectForNet(network, addr string) (net.Conn, error) {
 
   if network == "tor" {
     // connect to socks proxy
-    conn, err := net.Dial("tcp", self.torproc.SocksAddr())
+    conn, err := net.Dial("tcp", self.Tor.SocksAddr())
     if err != nil {
       return conn, err
     }
