@@ -39,7 +39,6 @@ func (self *HubHandler) Init(daemon *Daemon, conn net.Conn) {
   self.daemon = daemon
   self.conn = conn
   self.Broadacst = make(chan *ARCMessage, 24)
-  daemon.hubAdd(self)
   self.Filter.Init() 
 }
 
