@@ -17,6 +17,7 @@ probably full of bugs, use at own risk
     export GOPATH=$HOME/git
     mkdir -p $HOME/git
     go get github.com/majestrate/arcd/arcd
+    go get github.com/majestrate/bencode-go
     
 ### compile
 
