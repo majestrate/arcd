@@ -199,10 +199,7 @@ func (self *Daemon) PersistHub(network, addr, pubkey string) {
     handler.Init(self, conn)
     handler.TheirHash = hash
     handler.SendIdent()
-    self.Kad.Insert(hash)
-    go handler.WriteMessages()
-    handler.ReadMessages()
-    self.Kad.Remove(hash)
+    self.runHub(&handler)
   }
 }
 
@@ -256,7 +253,6 @@ func (self *HubHandler) ReadMessages() {
     if msg == nil {
       log.Println("did not read arc message")
       self.conn.Close()
-      self.daemon.hubRemove(self)
       return
     }
     buff := msg.Bytes()
@@ -324,6 +320,7 @@ func (self *HubHandler) ReadMessages() {
         } else {
           log.Println("hub failed to identify")
           self.conn.Close()
+          return
         }
       }
     }
@@ -351,7 +348,6 @@ func (self *HubHandler) WriteMessages() {
     if err != nil {
       log.Println("Failed to write message", err)
       self.conn.Close()
-      self.daemon.hubRemove(self)
       return
     }
   }
@@ -409,7 +405,19 @@ func (self *Daemon) Accept() {
     log.Println("new incoming hub connection", conn.RemoteAddr())
     handler := new(HubHandler)
     handler.Init(self, conn)
-    go handler.ReadMessages()
-    go handler.WriteMessages()
+    go self.runHub(handler)
   }
+}
+
+func (self *Daemon) runHub(handler *HubHandler) {
+  if handler.TheirHash != nil {
+    self.Kad.Insert(handler.TheirHash)
+  }
+  self.hubAdd(handler)
+  go handler.WriteMessages()
+  handler.ReadMessages()
+  if handler.TheirHash != nil {
+    self.Kad.Remove(handler.TheirHash)
+  }
+  self.hubRemove(handler)
 }
