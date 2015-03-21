@@ -158,7 +158,7 @@ func (self *IRC) acceptMessage(line string) bool {
   if action == "JOIN" || action == "PART" {
     if channelNameValid(target) {
       _, ok := self.channels[target]
-      return ok || self.Nick == nick
+      return ok //|| self.Nick == nick
     } 
   }
   return false
