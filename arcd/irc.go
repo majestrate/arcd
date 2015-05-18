@@ -117,6 +117,9 @@ func (self *IRC) end() {
   self.conn.Close() 
 }
 
+
+// parse an ircline
+// :soource action target :message
 func parseIRCLine(line string) (source, action, target, message string) {
   if ! strings.HasPrefix(line, ":") {
     return 
@@ -141,22 +144,29 @@ func parseIRCLine(line string) (source, action, target, message string) {
   return
 }
 
+// check if we should accept a line and pass it up to the user
 func (self *IRC) acceptMessage(line string) bool {
   source, action, target, message := parseIRCLine(line)
   var nick string
+  // extract nickname
   if strings.Count(source, "!") > 0 {
     nick = strings.Split(source, "!")[0]
   }
-  
+
+  // check for privmsg
   if action == "PRIVMSG" {
     if channelNameValid(target) {
       _, ok := self.channels[target]
+      // this is a private message from a valid channel not from us
       return ok && self.Nick != nick
     }
+    // this is a private message to us
     return target == self.Nick
   }
+  // check for JOIN/PART
   if action == "JOIN" || action == "PART" {
     if channelNameValid(message) {
+      // valid channel join/part
       _, ok := self.channels[message]
       return ok 
     } 
@@ -178,38 +188,52 @@ func (self *IRC) WriteMessages() {
   }
 }
 
+// handle irc client messages
 func (self *IRC) ReadMessages() {
   for {
+
     line := self.ReadLine()
+    // no more data
     if line == "" {
       self.end()
       break
     }
+    // check for ping
     if strings.HasPrefix(line, "PING ") {
       if line[5] == ':' {
         line = ":arcd PONG " + line[5:]
       } else {
         line = ":arcd PONG :" + line[5:]
       }
+      // send pong
       self.SendLine(line)
       continue
     }
+    // are we registered?
     if len(self.Nick) > 0 {
+      // is this a private message?
       if strings.HasPrefix(line , "PRIVMSG ") {
         ircline := fmt.Sprintf(":%s!user@arcd %s", self.Nick, line)
+        // broadcast line
         self.Daemon.Broadacst <- NewArcIRCLine(ircline)
       } else if strings.HasPrefix(line, "JOIN ") {
+        // join channel message
         chans := strings.Split(line[5:], ",")
+        // join the channels
         for idx := range(chans) {
           self.JoinChannel(chans[idx])
         }
       } else if strings.HasPrefix(line, "PART ") {
-        chans := strings.Split(line[5:], ",") 
+        // part channel message
+        chans := strings.Split(line[5:], ",")
+        // part the channels
         for idx := range(chans) {
           self.PartChannel(chans[idx])
         }
       }
     } else if strings.HasPrefix(line, "NICK ") {
+      // initial register process
+      // i hate irc clients
       idx := strings.Index(line, ":" )
       if idx > 0 {
         self.Nick = line[idx+1:]
@@ -217,13 +241,16 @@ func (self *IRC) ReadMessages() {
         self.Nick = line[5:]
       }
       log.Println(self.Nick)
+      // greet on register
       self.Greet()
     } else {
+      // log line if unknown(?)
       log.Println(line)
     }
   }
 }
 
+// send a numeric response
 func (self *IRC) SendNum(num, target, data string) {
   var line string
   if target == "" {
@@ -234,6 +261,8 @@ func (self *IRC) SendNum(num, target, data string) {
   self.SendLine(line)
 }
 
+// determine if a channel name is valid
+// TODO: make rfc compliant
 func channelNameValid(name string) bool {
   if ! strings.HasPrefix(name, "#")  {
     return false
@@ -244,42 +273,59 @@ func channelNameValid(name string) bool {
   return true
 }
 
+// join channel logic
 func (self *IRC) JoinChannel(chname string) {
+  // check for channel name validity
   if ! channelNameValid(chname) {
     self.SendNum("403", chname ,"No such channel")
     return
-  } 
-  _, ok := self.channels[chname]
-  if !ok {
-    self.channels[chname] = true
-    line := fmt.Sprintf(":%s!user@arcd JOIN %s", self.Nick, chname)
-    self.Send <- line
-    self.Daemon.Broadacst <- NewArcIRCLine(line)
-  } else {
-    self.SendNum("443", fmt.Sprintf("%s %s", self.Nick, chname), "already on channel")
   }
+  
+  _, ok := self.channels[chname]
 
+  // are we already in the channel?
+  if ok {
+    self.SendNum("443", fmt.Sprintf("%s %s", self.Nick, chname), "already on channel")
+    return
+  }
+  self.channels[chname] = true
+  // tell ourselves that we joined
+  line := fmt.Sprintf(":%s!user@arcd JOIN %s", self.Nick, chname)
+  self.Send <- line
+  // send a broadcast line
+  self.Daemon.Broadacst <- NewArcIRCLine(line)
 }
 
+// part the channel
 func (self *IRC) PartChannel(chname string) {
+  // channel name valid etc
   if ! channelNameValid(chname) {
     self.SendNum("403", chname ,"No such channel")
     return
-  } 
+  }
+
+  // delete channel presence
   var put bool
   _, ok := self.channels[chname]
   if ok {
     delete(self.channels, chname)
     put = true
   }
+
+  // announce result
   if put {
     line := fmt.Sprintf(":%s!user@arcd PART :%s", self.Nick, chname)
+    // tell us we parted
+    self.send <- line
+    // broadcast the part
     self.Daemon.Broadacst <- NewArcIRCLine(line)
   } else {
+    // we weren't on the channel
     self.SendNum("442", chname, "you are not on that channel")
   }
 }
 
+// send motd
 func (self *IRC) Motd() {
   self.SendNum("375", self.Nick, "- arcd MOTD")
   self.SendNum("372", self.Nick, "- benis")

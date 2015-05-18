@@ -14,7 +14,6 @@ func main() {
   peers := flag.String("peers", "peers.txt", "peers file")
   bind := flag.String("bind", "127.0.0.1:11001", "bind hub to address")
   ircd_bind := flag.String("ircd", "[::1]:6667", "bind ircd to address")
-  ping := flag.String("kad", "", "kad ping a peer")
   socksport := flag.Int("torsocks", 11005, "tor socks port")
   flag.Parse()
   
@@ -39,12 +38,6 @@ func main() {
   // do pings as needed
   for {
     time.Sleep(2 * time.Second)
-    if *ping != "" {
-      peer := arcd.UnFormatHash(*ping)
-      dmsg := arcd.NewDHTMessage("FIND")
-      msg := arcd.NewArcKADMessage(peer, dmsg)
-      daemon.SendKad(peer, msg)
-    }
   }
   
 }

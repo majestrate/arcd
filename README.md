@@ -18,7 +18,8 @@ probably full of bugs, use at own risk
     mkdir -p $HOME/git
     go get github.com/majestrate/arcd/arcd
     go get github.com/majestrate/bencode-go
-    
+    go get code.google.com/p/go.crypto/sha3
+
 ### compile
 
     cd $HOME/git/src/github.com/majestrate/arcd 
