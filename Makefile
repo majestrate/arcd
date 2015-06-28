@@ -1,6 +1,6 @@
 all:
-	go build arcd/*.go
-	go build -o arcd.bin arcd.go 
-	
+	go build nacl/*.go
+	go build arc/*.go
+	go build -o arcd main.go 
 clean:
-	rm -f arcd.bin
+	rm -f arcd
