@@ -15,7 +15,9 @@ type PeerInfo interface {
   // the network to use in net.Dial
   Net() string
   // the node hash of this peer
-  NodeHash() NodeHash
+  NodeHash() CryptoHash
+  // get string version
+  String() string
 }
 
 type LinkMessageHeader interface {
@@ -31,6 +33,15 @@ type LinkMessageHeader interface {
   Bytes() []byte
 }
 
+
+// creator of link messages
+type LinkMessageFactory interface {
+  // create the link level messages we send for this dht message
+  // splits and orders as needed
+  CreateMessagesForDHT(msg DHTMessage) []Message
+  //CreateMessagesForN2N(msg N2NMessage) []Message
+}
+
 // inter router link
 type Link interface {
   // channel that others poll on for messages from this link
@@ -40,7 +51,10 @@ type Link interface {
   RecvHeader() (LinkMessageHeader, error)
   // send a message
   // sends header and then message body
+  // Blocks
   SendMessage(msg Message, to_peer PeerInfo) error
   // run mainloop
   Mainloop()
+  // get the message factory for this
+  GetMessageFactory() LinkMessageFactory
 }

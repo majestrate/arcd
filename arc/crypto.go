@@ -4,7 +4,6 @@
 //
 package arcd
 
-
 // generic signature
 type Signature []byte
 

@@ -7,7 +7,23 @@ package arcd
 import (
   // nacl cgo bindings
   "github.com/majestrate/arcd/nacl"
+
+  "bytes"
+  "crypto/sha512"
+  "encoding/base64"
 )
+
+// cryptographic hash
+type CryptoHash [64]byte
+
+func (self CryptoHash) String() string {
+  return base64.StdEncoding.EncodeToString(self[:])
+}
+
+func (self CryptoHash) Equal(h CryptoHash) bool {
+  return bytes.Equal(self[:], h[:])
+}
+
 
 type CryptoBox_PrivKey []byte
 type CryptoBox_PubKey []byte
@@ -47,4 +63,12 @@ func (self CryptoBox_PubKey) EncryptAnon(data []byte) []byte {
 // wrapper for nacl.RandBytes
 func randBytes(size int) []byte {
   return nacl.RandBytes(size)
+}
+
+// crypto hash function
+func cryptoHash(data []byte) CryptoHash {
+  var h CryptoHash
+  digest := sha512.Sum512(data)
+  copy(h[:], digest[:])
+  return h
 }
