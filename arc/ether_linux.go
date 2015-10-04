@@ -17,22 +17,7 @@ package arc
 
 // open ethernet given interface name
 int ether_open(int if_idx, const unsigned char * hw_addr) {
-  int fd = -1;
-  fd = socket(AF_PACKET, SOCK_RAW, htons(0xD1CE));
-  if ( fd != -1 ) {
-    struct sockaddr_ll addr;
-    memset(&addr, 0, sizeof(struct sockaddr_ll));
-    addr.sll_protocol = htons(0xD1CE);
-    addr.sll_family = AF_PACKET;
-    addr.sll_halen = ETH_ALEN;
-    memcpy(&addr.sll_addr, hw_addr, addr.sll_halen);
-    if ( bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_ll)) == -1 ) {
-      close(fd);
-      return -1;
-    }
-    return fd;
-  } 
-  return -1;
+  return socket(AF_PACKET, SOCK_RAW, htons(0xD1CE));
 }
 
 size_t ether_recv(int fd, int if_idx, char * result) {
