@@ -74,6 +74,7 @@ func (r broadcastRouter) Run() {
       }
     case m, ok := <- r.ib:
       if ok {
+        log.Println(">>",m.URCLine())
         r.bc <- m
       }
     }
