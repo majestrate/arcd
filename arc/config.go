@@ -21,6 +21,7 @@ type RemoteHubConfig struct {
 type LocalHubConfig struct {
   Bind string
   Keys string
+  EtherBind string
 }
 
 type Config struct {

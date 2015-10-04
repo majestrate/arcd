@@ -15,6 +15,8 @@ type Message interface {
   URCLine() string
   // time sent
   Sent() uint64
+  // get the message command type
+  Type() uint32
 }
 
 

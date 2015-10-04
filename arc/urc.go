@@ -4,6 +4,7 @@
 package arc
 
 import (
+  "crypto/rand"
   "encoding/binary"
   "io"
 )
@@ -19,6 +20,10 @@ type urcMessage struct {
   body []byte
 }
 
+func (u urcMessage) Type() uint32 {
+  return binary.BigEndian.Uint32(u.hdr[14:18])
+}
+
 func (u urcMessage) RawBytes() (b []byte) {
   b = append(b, u.hdr[:]...)
   b = append(b, u.body...)
@@ -30,7 +35,7 @@ func (u urcMessage) Sent() uint64 {
 }
 
 func (u urcMessage) URCLine() string {
-  if u.hdr[14] == '\x00' {
+  if u.Type() == 0 {
     // plaintext
     return string(u.body)
   }
@@ -54,3 +59,15 @@ func (urc urcProtocol) ReadMessage(r io.Reader) (msg urcMessage, err error) {
 
 
 type urcConnection io.ReadWriteCloser
+
+func urcMessageFromURCLine(line string) urcMessage {
+  var hdr urcHeader
+  // random bytes
+  io.ReadFull(rand.Reader, hdr[18:])
+  // length
+  binary.BigEndian.PutUint16(hdr[:2], uint16(len(line)))
+  return urcMessage{
+    body: []byte(line),
+    hdr: hdr,
+  }
+}
