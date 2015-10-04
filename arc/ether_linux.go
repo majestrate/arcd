@@ -16,50 +16,63 @@ package arc
 #include <linux/if_arp.h>
 
 // open ethernet given interface name
-int ether_open(const char * ifname) {
+int ether_open(int if_idx, const unsigned char * hw_addr) {
   int fd = -1;
-  fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-  return fd;
+  fd = socket(AF_PACKET, SOCK_RAW, htons(0xD1CE));
+  if ( fd != -1 ) {
+    struct sockaddr_ll addr;
+    memset(&addr, 0, sizeof(struct sockaddr_ll));
+    addr.sll_protocol = htons(0xD1CE);
+    addr.sll_family = AF_PACKET;
+    addr.sll_halen = ETH_ALEN;
+    memcpy(&addr.sll_addr, hw_addr, addr.sll_halen);
+    if ( bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_ll)) == -1 ) {
+      close(fd);
+      return -1;
+    }
+    return fd;
+  } 
+  return -1;
 }
 
-size_t ether_recv(int fd, void * result) {
- return recvfrom(fd, result, ETH_FRAME_LEN, 0, NULL, NULL);
+size_t ether_recv(int fd, int if_idx, void * result) {
+  struct sockaddr_ll addr;
+  memset(&addr, 0, sizeof(struct sockaddr_ll));
+  addr.sll_hatype = ARPHRD_ETHER;
+  addr.sll_pkttype = PACKET_BROADCAST;
+  return recvfrom(fd, result, ETH_FRAME_LEN, 0, (struct sockaddr*)&addr, NULL);
 }
 
 // ethernet broadcast frame
-int ether_broadcast(int fd, int if_idx, void * if_hwaddr, const void * dataptr, const size_t datalen) {
-  char frame[ETH_FRAME_LEN];
+int ether_broadcast(int fd, int if_idx, const unsigned char * if_hwaddr, const char * dataptr, const size_t datalen) {
 
   if ( datalen + 14 > ETH_FRAME_LEN ) {
     // invalid size
     return -1;
   }
+  char frame[ETH_FRAME_LEN];
 
-  char * head = frame;
-  char * data = head + 14;
+  char* head = frame;
+  char* data = head + 14;
   struct ethhdr * eh = (struct ethhdr *) head;
   memcpy(data, dataptr, datalen);
 
   // broadcast address
   struct sockaddr_ll addr;
   addr.sll_family = AF_PACKET;
-  addr.sll_protocol = htons(0xD1CE);
-  addr.sll_hatype = ARPHRD_ETHER;
-  addr.sll_pkttype = PACKET_OTHERHOST;
   addr.sll_ifindex = if_idx;
   addr.sll_halen = ETH_ALEN;
-  memset(&addr.sll_addr, 0xff, ETH_ALEN);
+  memset(addr.sll_addr, 0xff, ETH_ALEN);
 
   // broadcast dest addr
-  memset((void*)frame, 0xff, ETH_ALEN);
+  memset(eh->h_dest, 0xff, ETH_ALEN);
   // source addr is our network interface
-  memcpy((void*)(frame+ETH_ALEN), if_hwaddr, ETH_ALEN);
+  memcpy(eh->h_source, if_hwaddr, ETH_ALEN);
   // ethernet protocol is 0xd1ce
   eh->h_proto = htons(0xD1CE);
   int result = -1;
 
-  result = sendto(fd, frame, datalen + 14, 0, (struct sockaddr *)&addr, sizeof(addr));
-
+  result = sendto(fd, (void*)&frame, datalen + 14, 0, (struct sockaddr *)&addr, sizeof(addr));
   return result;
 
 }
@@ -77,13 +90,12 @@ import (
   "log"
   "net"
   "time"
-  "unsafe"
 )
 
 type etherHub struct {
   fd C.int
   iface *net.Interface
-  hwaddr unsafe.Pointer
+  hwaddr [6]C.uchar
   send chan Message
   ib chan Message
   router Router
@@ -91,19 +103,19 @@ type etherHub struct {
 }
 
 // bind to a network interface
-func (eh etherHub) bind(iface string) (err error) {
+func (eh *etherHub) bind(iface string) (err error) {
   eh.iface, err = net.InterfaceByName(iface)
   if err == nil {
-    log.Println("bind ethernet to", iface)
-    eh.fd = C.ether_open(C.CString(iface))
-    if eh.fd == -1 {
-      err = errors.New("cannot bind to "+iface)
-      return
-    }
-    eh.hwaddr = C.malloc(C.size_t(6))
-    buff := C.GoBytes(eh.hwaddr, 6)
     if len(eh.iface.HardwareAddr) == 6 {
-      copy(buff, eh.iface.HardwareAddr)
+      log.Println("binding to", eh.iface.HardwareAddr)
+      for n, c := range eh.iface.HardwareAddr {
+        eh.hwaddr[n] = C.uchar(c)
+      }
+      eh.fd = C.ether_open(C.int(eh.iface.Index), &eh.hwaddr[0])
+      if eh.fd == -1 {
+        err = errors.New("cannot bind to "+iface)
+        return
+      }
     } else {
       err = errors.New("hardware address != 6")
     }
@@ -120,29 +132,30 @@ func (eh etherHub) SendChan() chan Message {
 }
 
 // broadcast raw data
-func (eh etherHub) broadcast(data []byte) (err error) {
+func (eh *etherHub) broadcast(data []byte) (err error) {
   // add to filter
   eh.filter.Add(data)
-  datalen := C.size_t(len(data))
-  dataptr := C.malloc(datalen)
-  buff := C.GoBytes(dataptr, C.int(len(data)))
-  copy(buff, data)
-  if dataptr == nil {
-    err = errors.New("malloc fail")
-  } else {
-    defer C.free(dataptr)
-    res := C.ether_broadcast(eh.fd, C.int(eh.iface.Index), eh.hwaddr, dataptr, datalen)
-    if res == -1 {
-      err = errors.New("failed to send ethernet frame")
-    }
+  log.Println("broadcast", len(data), eh.iface.Index, eh.hwaddr)
+  d := make([]C.char, len(data))
+  for i, c := range data {
+    d[i] = C.char(c)
   }
+  res := C.ether_broadcast(eh.fd, C.int(eh.iface.Index), &eh.hwaddr[0], &d[0], C.size_t(len(data)))
+  if res == -1 {
+    err = errors.New("failed to send ethernet frame")
+  }
+  log.Println("broadcasted", len(data))
   return
 }
 
 // run main
 func (eh etherHub) Run() {
   log.Println("run ethernet hub")
-  go eh.recvLoop()
+  go eh.sendLoop()
+  eh.recvLoop()
+}
+
+func (eh *etherHub) sendLoop() {
   for {
     select {
     case msg, ok := <- eh.ib:
@@ -152,11 +165,13 @@ func (eh etherHub) Run() {
         return
       }
     case msg, ok := <- eh.send:
+      log.Println("got send")
       if ok {
         // broadcast minus first 2 bytes
         err := eh.broadcast(msg.RawBytes()[2:])
         if err == nil {
           // we gud
+          continue
         } else {
           log.Println("failed to broadcast over ethernet", err)
         }
@@ -166,16 +181,22 @@ func (eh etherHub) Run() {
 }
 
 // run recv loop from ethernet
-func (eh etherHub) recvLoop() {
+func (eh *etherHub) recvLoop() {
   // big buffer
   ptr := C.malloc(1518)
   buff := C.GoBytes(ptr, 1518)
+  if buff == nil {
+    log.Println("failed to malloc")
+    return
+  }
   defer C.free(ptr)
   for {
     // low level recv
-    rsize := C.ether_recv(eh.fd, ptr)
+    idx := C.int(eh.iface.Index)
+    rsize := C.ether_recv(eh.fd, idx, ptr)
     recv_size := int(rsize)
     if recv_size >= 38 && recv_size <= 1518 {
+      log.Println("eth recv", recv_size)
       var msg urcMessage
       msg.body = make([]byte, recv_size - 38)
       // exclude ethernet header
@@ -195,7 +216,7 @@ func (eh etherHub) recvLoop() {
       eh.ib <- msg
     } else {
       log.Println("invalid ether_recv size:", recv_size)
-      time.Sleep(time.Millisecond)
+      time.Sleep(time.Second)
     }
   }
 }

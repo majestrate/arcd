@@ -19,13 +19,15 @@ func main() {
   
   if len(cfg.Local.EtherBind) > 0 {
     eth = arc.CreateEthernetHub(cfg.Local.EtherBind, router)
-    router.RegisterHub(eth)
+    router = router.RegisterHub(eth)
+    go eth.Run()
   }
   
   hub := arc.CreateHub(cfg.Local.Bind, cfg.Local.Keys, router)
   for _, remote := range cfg.Remote {
     hub.Persist(remote.Addr, remote.Port, remote.ProxyType, remote.ProxyAddr, remote.ProxyPort)
   }
-  router.RegisterHub(hub)
+  router = router.RegisterHub(hub)
+  go hub.Run()
   router.Run()
 }
