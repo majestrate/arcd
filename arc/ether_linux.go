@@ -35,12 +35,12 @@ int ether_open(int if_idx, const unsigned char * hw_addr) {
   return -1;
 }
 
-size_t ether_recv(int fd, int if_idx, void * result) {
-  struct sockaddr_ll addr;
-  memset(&addr, 0, sizeof(struct sockaddr_ll));
-  addr.sll_hatype = ARPHRD_ETHER;
-  addr.sll_pkttype = PACKET_BROADCAST;
-  return recvfrom(fd, result, ETH_FRAME_LEN, 0, (struct sockaddr*)&addr, NULL);
+size_t ether_recv(int fd, int if_idx, char * result) {
+  //struct sockaddr_ll addr;
+  //memset(&addr, 0, sizeof(struct sockaddr_ll));
+  //addr.sll_hatype = ARPHRD_ETHER;
+  //addr.sll_pkttype = PACKET_BROADCAST;
+  return recvfrom(fd, result, ETH_FRAME_LEN, 0, NULL, NULL);
 }
 
 // ethernet broadcast frame
@@ -183,28 +183,26 @@ func (eh *etherHub) sendLoop() {
 // run recv loop from ethernet
 func (eh *etherHub) recvLoop() {
   // big buffer
-  ptr := C.malloc(1518)
-  buff := C.GoBytes(ptr, 1518)
-  if buff == nil {
-    log.Println("failed to malloc")
-    return
-  }
-  defer C.free(ptr)
+  var buff [1518]C.char
   for {
     // low level recv
     idx := C.int(eh.iface.Index)
-    rsize := C.ether_recv(eh.fd, idx, ptr)
+    rsize := C.ether_recv(eh.fd, idx, &buff[0])
     recv_size := int(rsize)
     if recv_size >= 38 && recv_size <= 1518 {
       log.Println("eth recv", recv_size)
       var msg urcMessage
       msg.body = make([]byte, recv_size - 38)
       // exclude ethernet header
-      copy(msg.hdr[:2], buff[14:38])
+      for i, c := range buff[14:38] {
+        msg.hdr[i+2] = byte(c)
+      }
       // put urc header length
       binary.BigEndian.PutUint16(msg.hdr[:2], uint16(len(msg.body)))
       // put urc body
-      copy(msg.body, buff[38:])
+      for i, c := range buff[38:] {
+        msg.body[i] = byte(c)
+      }
       r := msg.RawBytes()
       if eh.filter.Contains(r) {
         // filter hit
