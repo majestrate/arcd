@@ -12,10 +12,11 @@ import (
 
 // base type for arcd router
 type Hub interface {
-  // get a channel for others to send messages on
-  SendChan() chan Message
+  // send a message on this hub
+  // add to filter and possibly drop
+  Send(m Message)
   // persist a connection
-  Persist(addr string, port int, proxyType, proxyAddr string, proxyPort int)
+  Persist(c RemoteHubConfig)
   // run all operations
   Run()
   // close hub
@@ -39,8 +40,8 @@ type basicHub struct {
   router Router
 }
 
-func (h basicHub) SendChan() chan Message {
-  return h.broadcast
+func (h basicHub) Send(m Message) {
+  h.broadcast <- m
 }
 
 func (h basicHub) Close() {
@@ -63,8 +64,9 @@ func (h basicHub) handleURC(conn Connection) {
     // read a message
     umsg, err = urc.ReadMessage(conn)
     if err == nil {
+      b := umsg.RawBytes()
       // add the raw bytes of this message to our bloom filter
-      f.Add(umsg.RawBytes())
+      f.Add(b)
       // tell router of inbound message
       h.router.InboundChan() <- umsg
     } else {
@@ -77,8 +79,12 @@ func (h basicHub) handleURC(conn Connection) {
   h.deregisterConn <- conn
 }
 
+func (h basicHub) Persist(c RemoteHubConfig) {
+  h.persist(c.Addr, c.Port, c.ProxyType, c.ProxyAddr, c.ProxyPort)
+}
+
 // persist a connection to a remote hub
-func (h basicHub) Persist(addr string, port int, proxyType, proxyAddr string, proxyPort int) {
+func (h *basicHub) persist(addr string, port int, proxyType, proxyAddr string, proxyPort int) {
   if proxyType == "socks" {
     // use socks proxy
     log.Printf("persist hub %s:%d proxy=%s://%s:%d", addr, port, proxyType, proxyAddr, proxyPort)
@@ -142,30 +148,30 @@ func (h basicHub) Run() {
         // check filter
         if f.Contains(b) {
           // filter hit, don't send it this way
-          continue
-        }
-        // add to bloom filter
-        f.Add(b)
-        // relay it
-        send := len(b)
-        sent := 0
-        log.Println("broadcast urc")
-        for {
-          // TODO: go routine for each connection?
-          n, err := c.Write(b[sent:])
-          if err == nil {
-            sent += n
-            if sent < send {
-              // continue sending it's a short write
-              continue
+        } else {
+          // add to bloom filter
+          f.Add(b)
+          // relay it
+          send := len(b)
+          sent := 0
+          log.Println("broadcast urc")
+          for {
+            // TODO: go routine for each connection?
+            n, err := c.Write(b[sent:])
+            if err == nil {
+              sent += n
+              if sent < send {
+                // continue sending it's a short write
+                continue
+              } else {
+                break
+              }
             } else {
+              // error writing
+              log.Println("failed to write message", err)
+              h.deregisterConn <- c
               break
             }
-          } else {
-            // error writing
-            log.Println("failed to write message", err)
-            h.deregisterConn <- c
-            break
           }
         }
       }

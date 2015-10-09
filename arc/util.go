@@ -17,5 +17,8 @@ func checkFile(fname string) bool {
 }
 
 func timeNow() uint64 {
+  // because taia96
   return uint64(time.Now().Unix() + 4611686018427387914)
 }
+
+

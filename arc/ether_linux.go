@@ -20,7 +20,7 @@ int ether_open(int if_idx, const unsigned char * hw_addr) {
   return socket(AF_PACKET, SOCK_RAW, htons(0xD1CE));
 }
 
-size_t ether_recv(int fd, int if_idx, char * result) {
+size_t ether_recv(int fd, int if_idx, unsigned char * result) {
   //struct sockaddr_ll addr;
   //memset(&addr, 0, sizeof(struct sockaddr_ll));
   //addr.sll_hatype = ARPHRD_ETHER;
@@ -29,7 +29,7 @@ size_t ether_recv(int fd, int if_idx, char * result) {
 }
 
 // ethernet broadcast frame
-int ether_broadcast(int fd, int if_idx, const unsigned char * if_hwaddr, const char * dataptr, const size_t datalen) {
+int ether_broadcast(int fd, int if_idx, const unsigned char * if_hwaddr, const unsigned char * dataptr, const size_t datalen) {
 
   if ( datalen + 14 > ETH_FRAME_LEN ) {
     // invalid size
@@ -55,11 +55,8 @@ int ether_broadcast(int fd, int if_idx, const unsigned char * if_hwaddr, const c
   memcpy(eh->h_source, if_hwaddr, ETH_ALEN);
   // ethernet protocol is 0xd1ce
   eh->h_proto = htons(0xD1CE);
-  int result = -1;
 
-  result = sendto(fd, (void*)&frame, datalen + 14, 0, (struct sockaddr *)&addr, sizeof(addr));
-  return result;
-
+  return sendto(fd, (void*)&frame, datalen + 14, 0, (struct sockaddr *)&addr, sizeof(addr));
 }
 
 void ether_close(int fd) {
@@ -70,7 +67,6 @@ void ether_close(int fd) {
 import "C"
 
 import (
-  "encoding/binary"
   "errors"
   "log"
   "net"
@@ -108,28 +104,23 @@ func (eh *etherHub) bind(iface string) (err error) {
   return 
 }
 
-func (eh etherHub) Persist(_ string, _ int, _, _ string, _ int) {
+func (eh etherHub) Persist(_ RemoteHubConfig) {
   return
 }
 
-func (eh etherHub) SendChan() chan Message {
-  return eh.send
+func (eh etherHub) Send(m Message) {
+  eh.send <- m
 }
-
 // broadcast raw data
 func (eh *etherHub) broadcast(data []byte) (err error) {
-  // add to filter
-  eh.filter.Add(data)
-  log.Println("broadcast", len(data), eh.iface.Index, eh.hwaddr)
-  d := make([]C.char, len(data))
+  d := make([]C.uchar, len(data))
   for i, c := range data {
-    d[i] = C.char(c)
+    d[i] = C.uchar(c)
   }
   res := C.ether_broadcast(eh.fd, C.int(eh.iface.Index), &eh.hwaddr[0], &d[0], C.size_t(len(data)))
   if res == -1 {
     err = errors.New("failed to send ethernet frame")
   }
-  log.Println("broadcasted", len(data))
   return
 }
 
@@ -146,19 +137,23 @@ func (eh *etherHub) sendLoop() {
     case msg, ok := <- eh.ib:
       if ok {
         eh.router.InboundChan() <- msg
-      } else {
-        return
       }
     case msg, ok := <- eh.send:
-      log.Println("got send")
       if ok {
-        // broadcast minus first 2 bytes
-        err := eh.broadcast(msg.RawBytes()[2:])
-        if err == nil {
-          // we gud
-          continue
+        data := msg.RawBytes()
+        if eh.filter.Contains(data) {
+          // filter hit
         } else {
-          log.Println("failed to broadcast over ethernet", err)
+          // add to filter
+          eh.filter.Add(data)
+
+          // broadcast
+          err := eh.broadcast(data)
+          if err == nil {
+            // we gud
+          } else {
+            log.Println("failed to broadcast over ethernet", err)
+          }
         }
       }
     }
@@ -168,34 +163,24 @@ func (eh *etherHub) sendLoop() {
 // run recv loop from ethernet
 func (eh *etherHub) recvLoop() {
   // big buffer
-  var buff [1518]C.char
+  var buff [1518]C.uchar
   for {
     // low level recv
     idx := C.int(eh.iface.Index)
     rsize := C.ether_recv(eh.fd, idx, &buff[0])
     recv_size := int(rsize)
-    if recv_size >= 38 && recv_size <= 1518 {
-      log.Println("eth recv", recv_size)
+    if recv_size > (14 + 26) && recv_size <= 1518 {
       var msg urcMessage
-      msg.body = make([]byte, recv_size - 38)
+      msg.body = make([]byte, recv_size - (14 + 26))
       // exclude ethernet header
-      for i, c := range buff[14:38] {
-        msg.hdr[i+2] = byte(c)
+      for i, c := range buff[14:14+26] {
+        msg.hdr[i] = byte(c)
       }
-      // put urc header length
-      binary.BigEndian.PutUint16(msg.hdr[:2], uint16(len(msg.body)))
       // put urc body
-      for i, c := range buff[38:] {
+      for i, c := range buff[14+26:recv_size] {
         msg.body[i] = byte(c)
       }
-      r := msg.RawBytes()
-      if eh.filter.Contains(r) {
-        // filter hit
-        continue
-      } else {
-        // filter pass
-        eh.filter.Add(r)
-      }
+      // we got inbound
       eh.ib <- msg
     } else {
       log.Println("invalid ether_recv size:", recv_size)
@@ -212,6 +197,7 @@ func CreateEthernetHub(ifname string, r Router) Hub {
   log.Println("create ethernet hub")
   h := etherHub{
     send: make(chan Message),
+    ib: make(chan Message),
     router: r,
   }
   err := h.bind(ifname)

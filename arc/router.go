@@ -11,8 +11,7 @@ import (
 // routes messages as needed
 type Router interface {
   InboundChan() chan Message
-  RegisterHub(h Hub) Router
-  Run()
+  Run(hubs ...Hub)
 }
 
 
@@ -24,11 +23,7 @@ func (r kadRouter) InboundChan() chan Message {
   return r.ib
 }
 
-func (r kadRouter) RegisterHub(h Hub) Router {
-  return r
-}
-
-func (r kadRouter) Run() {
+func (r kadRouter) Run(hubs ...Hub) {
 
 }
 
@@ -41,35 +36,35 @@ func NewKadRouter(keyfile string) Router {
 
 type broadcastRouter struct {
   bc, ib chan Message
-  hubs []Hub
+  filter bloomFilter
 }
 
 func (r broadcastRouter) InboundChan() chan Message {
   return r.ib
 }
 
-func (r broadcastRouter) RegisterHub(h Hub) Router {
-  r.hubs = append(r.hubs, h)
-  return r
-}
-
-func (r broadcastRouter) Run() {
+func (r broadcastRouter) Run(hubs ...Hub) {
   log.Println("run router")
   for {
     select {
     case m, ok := <- r.bc:
       if ok {
-        for _, h := range r.hubs {
-          log.Println("send hubs")
-          h.SendChan() <- m
+        for _, h := range hubs {
+          h.Send(m)
         }
       } else {
         break
       }
     case m, ok := <- r.ib:
       if ok {
-        log.Println(">>",m.URCLine())
-        r.bc <- m
+        b := m.RawBytes()
+        if r.filter.Contains(b) {
+          // filter hit
+        } else {
+          // filter pass
+          r.filter.Add(b)
+          r.bc <- m
+        }
       }
     }
   }

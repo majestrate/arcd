@@ -11,8 +11,8 @@ type Message interface {
 
   // get raw byteslice
   RawBytes() []byte
-  // get the urcline out of this message
-  URCLine() string
+  // get the ircline out of this message
+  Line() ircLine
   // time sent
   Sent() uint64
   // get the message command type

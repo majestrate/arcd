@@ -34,10 +34,10 @@ func (u urcMessage) Sent() uint64 {
   return binary.BigEndian.Uint64(u.hdr[2:10])
 }
 
-func (u urcMessage) URCLine() string {
+func (u urcMessage) Line() ircLine {
   if u.Type() == 0 {
     // plaintext
-    return string(u.body)
+    return ircLine(u.body)
   }
   return ""
 }
