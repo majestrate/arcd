@@ -16,6 +16,7 @@ type RemoteHubConfig struct {
   ProxyAddr string
   ProxyPort int
   ProxyType string
+  Password string
 }
 
 type LocalHubConfig struct {
@@ -25,7 +26,8 @@ type LocalHubConfig struct {
 }
 
 type Config struct {
-  Remote []RemoteHubConfig
+  URC []RemoteHubConfig
+  IRC []RemoteHubConfig
   Local LocalHubConfig
 }
  
@@ -53,7 +55,7 @@ func genConfig() (cfg Config) {
   }
 
   
-  cfg.Remote = append(cfg.Remote, aybHub)
+  cfg.URC = append(cfg.URC, aybHub)
   cfg.Local.Bind = "[::]:6789"
   cfg.Local.Keys = "privkey.dat"
 

@@ -20,16 +20,22 @@ func main() {
   if len(cfg.Local.EtherBind) > 0 {
     eth = arc.CreateEthernetHub(cfg.Local.EtherBind, router)
   }
+
+  irc := arc.NewIRCHub(router)
+  go irc.Run()
+  for _, remote := range cfg.IRC {
+    go irc.Persist(remote)
+  }
   
   hub := arc.CreateHub(cfg.Local.Bind, cfg.Local.Keys, router)
-  for _, remote := range cfg.Remote {
-    hub.Persist(remote)
+  for _, remote := range cfg.URC {
+    go hub.Persist(remote)
   }
   go hub.Run()
   if eth == nil {
-    router.Run(hub)
+    router.Run(hub, irc)
   } else {
     go eth.Run()
-    router.Run(hub, eth)
+    router.Run(hub, eth, irc)
   }
 }

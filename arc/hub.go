@@ -88,40 +88,36 @@ func (h *basicHub) persist(addr string, port int, proxyType, proxyAddr string, p
   if proxyType == "socks" {
     // use socks proxy
     log.Printf("persist hub %s:%d proxy=%s://%s:%d", addr, port, proxyType, proxyAddr, proxyPort)
-    go func() {
-      for {
-        // cooldown
-        time.Sleep(time.Second)
-        log.Println("connecting to hub", addr)
-        // connect to socks proxy
-        conn, err := socksConnect(proxyAddr, proxyPort, addr, port)
-        if err == nil {
-          log.Println("connected to", addr)
-          // handle connection
-          h.handleURC(conn)
-        } else{ 
-          log.Println("cannot connect to", addr, err)
-        }
+    for {
+      // cooldown
+      time.Sleep(time.Second)
+      log.Println("connecting to hub", addr)
+      // connect to socks proxy
+      conn, err := socksConnect(proxyAddr, proxyPort, addr, port)
+      if err == nil {
+        log.Println("connected to", addr)
+        // handle connection
+        h.handleURC(conn)
+      } else{ 
+        log.Println("cannot connect to", addr, err)
       }
-    }()
+    }
   } else {
     log.Printf("persist hub %s:%d", addr, port)
-    go func() {
-      for {
-        // cooldown
-        time.Sleep(time.Second)
-        log.Println("connecting to hub", addr)
-        // dial out
-        conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", addr, port))
-        log.Println("connected to", addr)
-        if err == nil {
-          // handle connection
-          h.handleURC(conn)
-        } else {
-          log.Println("cannot connect to", addr, err)
-        }
+    for {
+      // cooldown
+      time.Sleep(time.Second)
+      log.Println("connecting to hub", addr)
+      // dial out
+      conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", addr, port))
+      log.Println("connected to", addr)
+      if err == nil {
+        // handle connection
+        h.handleURC(conn)
+      } else {
+        log.Println("cannot connect to", addr, err)
       }
-    }()
+    }
   }
 }
 
