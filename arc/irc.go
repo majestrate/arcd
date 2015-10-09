@@ -37,6 +37,7 @@ func (irc ircBridge) produce(chnl chan Message) (err error) {
   for sc.Scan() {
     
     line := sc.Text()
+    log.Println(line)
     l := ircLine(line)
     cmd := l.Command()
     // accept certain commands
