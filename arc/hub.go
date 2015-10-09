@@ -150,7 +150,6 @@ func (h basicHub) Run() {
           // relay it
           send := len(b)
           sent := 0
-          log.Println("broadcast urc")
           for {
             // TODO: go routine for each connection?
             n, err := c.Write(b[sent:])
