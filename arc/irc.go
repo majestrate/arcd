@@ -56,7 +56,7 @@ type ircAuthInfo string
 
 // linkname component
 func (info ircAuthInfo) Name() string {
-  return "arcd"
+  return "arcnet.tld"
 }
 
 // linkpass component
@@ -66,7 +66,7 @@ func (info ircAuthInfo) Pass() string {
 
 // write a line
 func (irc ircBridge) Line(format string, args ...interface{}) (err error) {
-  _, err = fmt.Fprintf(irc, format, args)
+  _, err = fmt.Fprintf(irc, format, args...)
   _, err = io.WriteString(irc, "\n")
   return
 }
