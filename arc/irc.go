@@ -25,7 +25,7 @@ func (line ircLine) Command() (cmd string) {
     }
   } else {
     parts := strings.Split(l, " ")
-    cmd = l[0]
+    cmd = parts[0]
   }
   return
 }
@@ -54,7 +54,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     cmd := l.Command()
     if cmd == "PING" {
       // send pong reply
-      irc.Line(":%s PONG :%s", irc.name, cmd.Param())
+      irc.Line(":%s PONG :%s", irc.name, l.Param())
     }
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
@@ -99,7 +99,6 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
     if line.Command() == "PING" {
       // send a pong if we got a ping
       err = irc.Line(":%s PONG :%s", auth.Name(), line.Param())
-      irc.name = auth.Name()
       // we have handshaked
       log.Println("irchub handshake good")
       return
@@ -124,7 +123,7 @@ func (h ircHub) Send(m Message) {
 
 func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err error) {
   chnl := make(chan ircLine)
-  irc := ircBridge{c}
+  irc := ircBridge{c, auth.Name()}
   err = irc.handshake(auth)
   if err == nil {
     h.regis <- chnl
