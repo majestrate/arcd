@@ -39,11 +39,21 @@ func (line ircLine) Param() (param string) {
 
 type ircBridge struct {
   io.ReadWriteCloser
-  name string
+  name, nick string
+}
+
+// an irc channel presence
+type ircChannel struct {
+  nicks []string
+  topic string
 }
 
 // read lines and send ircLines down a channel to be processed
 func (irc *ircBridge) produce(chnl chan Message) (err error) {
+  // user -> last message
+  users := make(map[string]int64)
+  // channel -> presence
+  chans := make(map[string]ircChannel)
   // for each line
   sc := bufio.NewScanner(irc)
   log.Println("irchub produce")
@@ -56,6 +66,11 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     if cmd == "PING" {
       // send pong reply
       irc.Line(":%s PONG :%s", irc.name, l.Param())
+    } else if cmd == "SERVER" {
+      // we got a server command from the remote, we are connected
+      irc.Line("NICK %s :1", irc.nick)
+      irc.Line(":%s USER serverlink arcd arcd :arc network", irc.nick)
+      irc.Line(":%")
     }
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG"} {
@@ -74,7 +89,7 @@ type ircAuthInfo string
 
 // linkname component
 func (info ircAuthInfo) Name() string {
-  return "arcnet.tld"
+  return "arcnet"
 }
 
 // linkpass component
@@ -112,7 +127,7 @@ func (h ircHub) Send(m Message) {
 
 func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err error) {
   chnl := make(chan ircLine)
-  irc := ircBridge{c, auth.Name()}
+  irc := ircBridge{c, auth.Name(), "archub"}
   err = irc.handshake(auth)
   if err == nil {
     h.regis <- chnl
