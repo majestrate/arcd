@@ -1,6 +1,7 @@
 package main
 
 import (
+  "bufio"
   "github.com/majestrate/arcd/arc"
   "os"
 )
@@ -33,9 +34,17 @@ func main() {
   }
   go hub.Run()
   if eth == nil {
-    router.Run(hub, irc)
+    go router.Run(hub, irc)
   } else {
     go eth.Run()
-    router.Run(hub, eth, irc)
+    go router.Run(hub, eth, irc)
+  }
+
+  sc := bufio.NewScanner(os.Stdin)
+  chnl := router.InboundChan()
+  for sc.Scan() {
+    txt := sc.Text()
+    m := arc.Privmsg("stdin", "#overchan", txt)
+    chnl <- m
   }
 }

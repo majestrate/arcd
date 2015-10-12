@@ -6,6 +6,7 @@ package arc
 import (
   "crypto/rand"
   "encoding/binary"
+  "fmt"
   "io"
 )
 
@@ -21,7 +22,7 @@ type urcMessage struct {
 }
 
 func (u urcMessage) Type() uint32 {
-  return binary.BigEndian.Uint32(u.hdr[14:18])
+  return binary.LittleEndian.Uint32(u.hdr[14:18])
 }
 
 func (u urcMessage) RawBytes() (b []byte) {
@@ -65,9 +66,14 @@ func urcMessageFromURCLine(line string) urcMessage {
   // random bytes
   io.ReadFull(rand.Reader, hdr[18:])
   // length
-  binary.BigEndian.PutUint16(hdr[:2], uint16(len(line)))
+  binary.BigEndian.PutUint16(hdr[:], uint16(len(line)))
+  binary.BigEndian.PutUint64(hdr[2:], timeNow())
   return urcMessage{
     body: []byte(line),
     hdr: hdr,
   }
+}
+
+func Privmsg(from, to, msg string) Message {
+  return urcMessageFromURCLine(fmt.Sprintf(":%s!arc@arcnet PRIVMSG %s :%s\n", from, to, msg))
 }

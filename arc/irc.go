@@ -77,9 +77,9 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
   // send pass line
   err = irc.Line("PASS %s", auth.Pass())
   err = irc.Line("SERVER %s 1", auth.Name())
-  if err == nil && sc.Scan() {
+  for err == nil && sc.Scan() {
     line := ircLine(sc.Text())
-    log.Println("irchub handshake response", line)
+    log.Println("irchub hanshake:" line)
   }
   return
 }
