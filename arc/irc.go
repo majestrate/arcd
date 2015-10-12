@@ -45,6 +45,7 @@ type ircBridge struct {
 // read lines and send ircLines down a channel to be processed
 func (irc *ircBridge) produce(sc *bufio.Scanner, chnl chan Message) (err error) {
   // for each line
+  log.Println("irchub produce")
   for sc.Scan() {
     
     line := sc.Text()
