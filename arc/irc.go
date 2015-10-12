@@ -79,7 +79,7 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
   err = irc.Line("SERVER %s 1", auth.Name())
   for err == nil && sc.Scan() {
     line := ircLine(sc.Text())
-    log.Println("irchub hanshake:" line)
+    log.Println("irchub hanshake:", line)
   }
   return
 }
