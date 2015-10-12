@@ -20,10 +20,10 @@ func (line ircLine) Command() (cmd string) {
   l := string(line)
   if strings.HasPrefix(l, ":") {
     idx1 := strings.Index(l, " ")
-    if idx1 > 0 {
-      idx2 := strings.Index(l[idx1:], " ")
+    if idx1 > 1 {
+      idx2 := strings.Index(l[1+idx1:], " ")
       if idx2 > 1 {
-        cmd = strings.ToUpper(l[idx1:idx2-1])
+        cmd = strings.ToUpper(l[1+idx1:idx2])
       }
     }
   }
