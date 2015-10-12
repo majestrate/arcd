@@ -119,6 +119,17 @@ func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err erro
   err = irc.handshake(auth)
   if err == nil {
     h.regis <- chnl
+    // write messages
+    go func() {
+      for {
+        line, ok := <- chnl
+        if ok {
+          irc.Line("%s", line)
+        } else {
+          return
+        }
+      }
+    }()
     // read messages
     irc.produce(h.ib)
     h.deregis <- chnl
@@ -163,6 +174,7 @@ func (h ircHub) Run() {
       }
     case chnl, ok := <- h.regis:
       if ok {
+        log.Println("irchub connection registerd")
         conns[chnl] = true
       }
     case chnl, ok := <- h.deregis:
