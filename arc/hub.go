@@ -51,7 +51,7 @@ func (h basicHub) Close() {
 }
 
 // handle a urc connection inbound outbound doesn't matter
-func (h basicHub) handleURC(conn Connection) {
+func (h *basicHub) handleURC(conn Connection) {
   // register our connection
   h.registerConn <- conn
   // new protocol state
