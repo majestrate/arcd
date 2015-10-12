@@ -23,6 +23,9 @@ func (line ircLine) Command() (cmd string) {
     if len(parts) > 1 {
       cmd = parts[1]
     }
+  } else {
+    parts := strings.Split(l, " ")
+    cmd = l[0]
   }
   return
 }
@@ -36,10 +39,11 @@ func (line ircLine) Param() (param string) {
 
 type ircBridge struct {
   io.ReadWriteCloser
+  name string
 }
 
 // read lines and send ircLines down a channel to be processed
-func (irc ircBridge) produce(chnl chan Message) (err error) {
+func (irc *ircBridge) produce(chnl chan Message) (err error) {
   sc := bufio.NewScanner(irc)
   // for each line
   for sc.Scan() {
@@ -48,6 +52,10 @@ func (irc ircBridge) produce(chnl chan Message) (err error) {
     log.Println(line)
     l := ircLine(line)
     cmd := l.Command()
+    if cmd == "PING" {
+      // send pong reply
+      irc.Line(":%s PONG :%s", irc.name, cmd.Param())
+    }
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
       if cmd == c {
@@ -91,6 +99,7 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
     if line.Command() == "PING" {
       // send a pong if we got a ping
       err = irc.Line(":%s PONG :%s", auth.Name(), line.Param())
+      irc.name = auth.Name()
       // we have handshaked
       log.Println("irchub handshake good")
       return
