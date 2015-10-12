@@ -109,6 +109,7 @@ func (eh etherHub) Persist(_ RemoteHubConfig) {
 }
 
 func (eh etherHub) Send(m Message) {
+  eh.filter.Add(m.RawBytes())
   eh.send <- m
 }
 // broadcast raw data
@@ -180,6 +181,8 @@ func (eh *etherHub) recvLoop() {
       for i, c := range buff[14+26:recv_size] {
         msg.body[i] = byte(c)
       }
+      // add to filter
+      eh.filter.Add(msg.RawBytes())
       // we got inbound
       eh.ib <- msg
     } else {
