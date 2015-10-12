@@ -78,7 +78,8 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG"} {
       if cmd == c {
-        chnl <- urcMessageFromURCLine(line)
+        m := urcMessageFromURCLine(line)
+        chnl <- m
         break
       }
     }
@@ -179,7 +180,6 @@ func (h ircHub) Run() {
     select {
     case m, ok := <- h.ib:
       if ok {
-        log.Println("send to router")
         h.router.InboundChan() <- m
       }
     case m, ok := <- h.ob:

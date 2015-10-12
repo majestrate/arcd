@@ -1,9 +1,9 @@
 package main
 
 import (
-  "bufio"
   "github.com/majestrate/arcd/arc"
   "os"
+  "time"
 )
 
 func main() {
@@ -40,11 +40,10 @@ func main() {
     go router.Run(hub, eth, irc)
   }
 
-  sc := bufio.NewScanner(os.Stdin)
   chnl := router.InboundChan()
-  for sc.Scan() {
-    txt := sc.Text()
-    m := arc.Privmsg("stdin", "#overchan", txt)
+  for {
+    m := arc.Privmsg("arcd", "#status", "keep alive")
     chnl <- m
+    time.Sleep(10 * time.Second)
   }
 }
