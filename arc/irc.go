@@ -22,8 +22,8 @@ func (line ircLine) Command() (cmd string) {
     idx1 := strings.Index(l, " ")
     if idx1 > 1 {
       idx2 := strings.Index(l[1+idx1:], " ")
-      if idx2 > 1 {
-        cmd = strings.ToUpper(l[1+idx1:idx2])
+      if idx2 > idx1 {
+        cmd = strings.ToUpper(l[1+idx1:idx2-1])
       }
     }
   }
