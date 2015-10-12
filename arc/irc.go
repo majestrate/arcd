@@ -58,7 +58,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
       irc.Line(":%s PONG :%s", irc.name, l.Param())
     }
     // accept certain commands
-    for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
+    for _, c := range []string{"NOTICE", "PRIVMSG"} {
       if cmd == c {
         chnl <- urcMessageFromURCLine(line)
         break
