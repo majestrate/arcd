@@ -49,7 +49,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
   for sc.Scan() {
     
     line := sc.Text()
-    log.Println(line)
+    log.Println("irchub server2hub", line)
     l := ircLine(line)
     cmd := l.Command()
     if cmd == "PING" {
@@ -132,6 +132,7 @@ func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err erro
       for {
         line, ok := <- chnl
         if ok {
+          log.Println("irchub line2server>>", line)
           irc.Line("%s", line)
         } else {
           return
