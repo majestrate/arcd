@@ -51,9 +51,9 @@ type ircChannel struct {
 // read lines and send ircLines down a channel to be processed
 func (irc *ircBridge) produce(chnl chan Message) (err error) {
   // user -> last message
-  users := make(map[string]int64)
+  //users := make(map[string]int64)
   // channel -> presence
-  chans := make(map[string]ircChannel)
+  //chans := make(map[string]ircChannel)
   // for each line
   sc := bufio.NewScanner(irc)
   log.Println("irchub produce")
@@ -66,11 +66,14 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     if cmd == "PING" {
       // send pong reply
       irc.Line(":%s PONG :%s", irc.name, l.Param())
+      log.Println("irchub replied to ping")
     } else if cmd == "SERVER" {
       // we got a server command from the remote, we are connected
+      log.Println("we have connected to the ircd")
       irc.Line("NICK %s :1", irc.nick)
       irc.Line(":%s USER serverlink arcd arcd :arc network", irc.nick)
-      irc.Line(":%")
+      irc.Line(":%s JOIN #status", irc.nick)
+      irc.Line(":%s PRIVMSG #status :arcnet link up", irc.nick)
     }
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG"} {
