@@ -14,6 +14,16 @@ import (
 )
 
 
+func extractNick(str string) (nick string) {
+  idx := strings.Index(str, "!")
+  if idx > 1 {
+    nick = str[:idx]
+  } else {
+    nick = str
+  }
+  return
+}
+
 type ircLine string
 
 func (line ircLine) Command() (cmd string) {
@@ -30,6 +40,30 @@ func (line ircLine) Command() (cmd string) {
   return
 }
 
+func (line ircLine) Source() (src string) {
+  l := string(line)
+  if strings.HasPrefix(l, ":") {
+    src = strings.Split(l[1:], " ")[0]
+  }
+  return
+}
+
+func (line ircLine) Target() (targ string) {
+  l := string(line)
+  if strings.HasPrefix(l, ":") {
+    parts := strings.Split(l, " ")
+    if len(parts) > 2 {
+      targ = parts[2]
+    }
+  } else {
+    parts := strings.Split(l, " ")
+    if len(parts) > 1 {
+      targ = parts[1]
+    }
+  }
+  return
+}
+
 func (line ircLine) Param() (param string) {
   l := string(line)
   // get index of : minus the first char
@@ -40,6 +74,13 @@ func (line ircLine) Param() (param string) {
 type ircBridge struct {
   io.ReadWriteCloser
   name, nick string
+  // urc user -> last message
+  urcusers map[string]int64
+  // channel -> presence
+  chans map[string]ircChannel
+  // nick -> is from irc server
+  nicks map[string]bool
+  
 }
 
 // an irc channel presence
@@ -50,10 +91,6 @@ type ircChannel struct {
 
 // read lines and send ircLines down a channel to be processed
 func (irc *ircBridge) produce(chnl chan Message) (err error) {
-  // user -> last message
-  //users := make(map[string]int64)
-  // channel -> presence
-  //chans := make(map[string]ircChannel)
   // for each line
   sc := bufio.NewScanner(irc)
   log.Println("irchub produce")
@@ -63,20 +100,29 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     log.Println("irchub server2hub", line)
     l := ircLine(line)
     cmd := l.Command()
-    if cmd == "PING" {
-      // send pong reply
+    target := l.Target()
+    
+    switch cmd  {
+    case "PING":
+      // server ping
       irc.Line(":%s PONG :%s", irc.name, l.Param())
-      log.Println("irchub replied to ping")
-    } else if cmd == "SERVER" {
+      break
+    case "SERVER":
       // we got a server command from the remote, we are connected
       log.Println("we have connected to the ircd")
       irc.Line("NICK %s :1", irc.nick)
       irc.Line(":%s USER serverlink arcd arcd :arc network", irc.nick)
       irc.Line(":%s JOIN #status", irc.nick)
       irc.Line(":%s PRIVMSG #status :arcnet link up", irc.nick)
+      irc.nicks[irc.nick] = false
+      break
+    case "NICK":
+      // register nick
+      irc.nicks[target] = true
+      break
     }
     // accept certain commands
-    for _, c := range []string{"NOTICE", "PRIVMSG"} {
+    for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
       if cmd == c {
         m := urcMessageFromURCLine(line)
         chnl <- m
@@ -86,6 +132,37 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
   }
   err = sc.Err()
   return
+}
+
+// consume messages from hub
+func (irc *ircBridge) consume(chnl chan ircLine) {
+  for {
+    line, ok := <- chnl
+    if ok {
+      target := line.Target()
+      nick := extractNick(target)
+      cmd := line.Command()
+      switch cmd {
+      case "NICK":
+        break
+      case "PRIVMSG":
+        local, ok := irc.nicks[nick]
+        if ok {
+          // nick presence tracked
+          if local {
+            // this nick is local to the irc server
+            // don't forward it
+            break
+          } else {
+            irc.Line("%s", line)
+          }
+        }
+        break
+      }
+    } else {
+      return
+    }
+  }
 }
 
 type ircAuthInfo string
@@ -131,22 +208,12 @@ func (h ircHub) Send(m Message) {
 
 func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err error) {
   chnl := make(chan ircLine)
-  irc := ircBridge{c, auth.Name(), "archub"}
+  irc := ircBridge{c, auth.Name(), "archub", make(map[string]int64),make(map[string]ircChannel), make(map[string]bool)}
   err = irc.handshake(auth)
   if err == nil {
     h.regis <- chnl
     // write messages
-    go func() {
-      for {
-        line, ok := <- chnl
-        if ok {
-          log.Println("irchub line2server>>", line)
-          irc.Line("%s", line)
-        } else {
-          return
-        }
-      }
-    }()
+    go irc.consume(chnl)
     // read messages
     irc.produce(h.ib)
     h.deregis <- chnl
