@@ -95,6 +95,7 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
       // send a pong if we got a ping
       err = irc.Line(":%s PONG :%s", auth.Name(), line.Param())
       // we have handshaked
+      log.Println("irchub handshake good")
       return
     }
   }
