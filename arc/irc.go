@@ -92,7 +92,7 @@ type ircAuthInfo string
 
 // linkname component
 func (info ircAuthInfo) Name() string {
-  return "arcnet"
+  return "arcnet.tld"
 }
 
 // linkpass component
