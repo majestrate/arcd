@@ -43,8 +43,7 @@ type ircBridge struct {
 }
 
 // read lines and send ircLines down a channel to be processed
-func (irc *ircBridge) produce(chnl chan Message) (err error) {
-  sc := bufio.NewScanner(irc)
+func (irc *ircBridge) produce(sc *bufio.Scanner, chnl chan Message) (err error) {
   // for each line
   for sc.Scan() {
     
@@ -88,8 +87,8 @@ func (irc ircBridge) Line(format string, args ...interface{}) (err error) {
   return
 }
 
-func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
-  sc := bufio.NewScanner(irc)
+func (irc *ircBridge) handshake(auth ircAuthInfo) (sc *bufio.Scanner, err error) {
+  sc = bufio.NewScanner(irc)
   // send pass line
   err = irc.Line("PASS %s", auth.Pass())
   err = irc.Line("SERVER %s 1", auth.Name())
@@ -124,7 +123,7 @@ func (h ircHub) Send(m Message) {
 func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err error) {
   chnl := make(chan ircLine)
   irc := ircBridge{c, auth.Name()}
-  err = irc.handshake(auth)
+  sc, err := irc.handshake(auth)
   if err == nil {
     h.regis <- chnl
     // write messages
@@ -140,7 +139,7 @@ func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err erro
       }
     }()
     // read messages
-    irc.produce(h.ib)
+    irc.produce(sc, h.ib)
     h.deregis <- chnl
   }
   return
