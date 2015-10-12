@@ -19,12 +19,9 @@ type ircLine string
 func (line ircLine) Command() (cmd string) {
   l := string(line)
   if strings.HasPrefix(l, ":") {
-    idx1 := strings.Index(l, " ")
-    if idx1 > 1 {
-      idx2 := strings.Index(l[1+idx1:], " ")
-      if idx2 > idx1 {
-        cmd = strings.ToUpper(l[1+idx1:idx2-1])
-      }
+    parts := strings.Split(l, " ")
+    if len(parts) > 1 {
+      cmd = parts[1]
     }
   }
   return
