@@ -26,6 +26,13 @@ func (line ircLine) Command() (cmd string) {
   return
 }
 
+func (line ircLine) Param() (param string) {
+  l := string(line)
+  // get index of : minus the first char
+  idx := strings.Index(l[1:], ":")
+  return l[1+idx:]
+}
+
 type ircBridge struct {
   io.ReadWriteCloser
 }
@@ -80,6 +87,12 @@ func (irc *ircBridge) handshake(auth ircAuthInfo) (err error) {
   for err == nil && sc.Scan() {
     line := ircLine(sc.Text())
     log.Println("irchub hanshake:", line)
+    if line.Command() == "PING" {
+      // send a pong if we got a ping
+      err = irc.Line(":%s PONG :%s", auth.Name(), line.Param())
+      // we have handshaked
+      return
+    }
   }
   return
 }
