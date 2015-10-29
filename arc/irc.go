@@ -101,7 +101,8 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     l := ircLine(line)
     cmd := l.Command()
     target := l.Target()
-    
+    param  := l.Param()
+    nick := extractNick(l.Source())
     switch cmd  {
     case "PING":
       // server ping
@@ -124,7 +125,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
       if cmd == c {
-        m := urcMessageFromURCLine(line)
+        m := urcMessageFromURCLine(fmt.Sprintf(":%s!ircbridge@arcnet %s %s :%s", nick, c, target, param))
         chnl <- m
         break
       }
