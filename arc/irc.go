@@ -162,10 +162,12 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
                 // change names
                 delete(irc.nicks, nick)
                 irc.nicks[target] = false
+                irc.Line("%s", line)
               }
             } else {
               // we don't have this nick, track it, it's remote
               irc.nicks[target] = false
+              irc.Line("%s", line)
             }
           }
         }
