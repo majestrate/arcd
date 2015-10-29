@@ -125,7 +125,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     // accept certain commands
     for _, c := range []string{"NOTICE", "PRIVMSG", "JOIN", "PART", "QUIT"} {
       if cmd == c {
-        m := urcMessageFromURCLine(fmt.Sprintf(":%s!ircbridge@arcnet %s %s :%s", nick, c, target, param))
+        m := urcMessageFromURCLine(fmt.Sprintf(":%s!ircbridge@arcnet %s %s %s", nick, c, target, param))
         chnl <- m
         break
       }
