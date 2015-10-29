@@ -140,8 +140,9 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
     line, ok := <- chnl
     log.Println("irchub consume", line)
     if ok {
-      target := line.Source()
-      nick := extractNick(target)
+      src := line.Source()
+      target := line.Target()
+      nick := extractNick(src)
       cmd := line.Command()
       param := line.Param()
       switch cmd {
@@ -192,7 +193,7 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
           irc.Line("NICK %s :1", nick)
           irc.Line(":%s USER user arcd arcd :remote user", nick)
           irc.Line(":%s MODE %s +i", nick, nick)
-          irc.Line(":%s JOIN %s", nick, param)
+          irc.Line(":%s JOIN %s", nick, target)
           irc.Line(":%s PRIVMSG %s :%s", nick, target, param)
         }
         break
