@@ -208,6 +208,7 @@ func (info ircAuthInfo) Pass() string {
 // write a line
 func (irc ircBridge) Line(format string, args ...interface{}) (err error) {
   _, err = fmt.Fprintf(irc, format, args...)
+  log.Println("hub2server", fmt.Sprintf(format, args...))
   _, err = io.WriteString(irc, "\n")
   return
 }
