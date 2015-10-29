@@ -105,7 +105,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
     switch cmd  {
     case "PING":
       // server ping
-      irc.Line(":%s PONG :%s", irc.name, l.Param())
+      irc.Line(":%s PONG %s", irc.name, l.Param())
       break
     case "SERVER":
       // we got a server command from the remote, we are connected
