@@ -140,7 +140,7 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
     line, ok := <- chnl
     log.Println("irchub consume", line)
     if ok {
-      target := line.Target()
+      target := line.Source()
       nick := extractNick(target)
       cmd := line.Command()
       param := line.Param()
