@@ -183,6 +183,15 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
           } else {
             irc.Line("%s", line)
           }
+        } else {
+          // not tracked
+          // is remote
+          irc.nicks[nick] = false
+          irc.Line("NICK %s :1", nick)
+          irc.Line(":%s USER user arcd arcd :remote user", nick)
+          irc.Line(":%s MODE +i %s", nick, nick)
+          irc.Line(":%s JOIN %s", nick, target)
+          irc.Line("%s", line)
         }
         break
       }
