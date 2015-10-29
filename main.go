@@ -13,7 +13,7 @@ func main() {
   
   cfg := arc.LoadConfig(fname)
 
-  router := arc.NewKadRouter(cfg.Local.Keys)
+  router := arc.NewBroadcastRouter(cfg.Local.Keys)
 
   var hubs []arc.Hub
   
