@@ -144,6 +144,31 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
       cmd := line.Command()
       switch cmd {
       case "NICK":
+        local, ok := irc.nicks[nick]
+        if ok {
+          // we are tracking this guy
+          if local {
+            // this nick is local to the irc server
+            // don't forward it
+          } else {
+            local, ok = irc.nicks[target]
+            if ok {
+              if local {
+                // this nick is local to the irc server
+                // someone spoofed the nickchange
+                // don't forward
+              } else {
+                // this nick is not local but it is tracked
+                // change names
+                delete(irc.nicks, nick)
+                irc.nicks[target] = false
+              }
+            } else {
+              // we don't have this nick, track it, it's remote
+              irc.nicks[target] = false
+            }
+          }
+        }
         break
       case "PRIVMSG":
         local, ok := irc.nicks[nick]

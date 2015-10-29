@@ -4,6 +4,7 @@
 package arc
 
 import (
+  "encoding/binary"
   "io"
 )
 
@@ -18,6 +19,12 @@ type Message interface {
   // get the message command type
   Type() uint32
 }
+
+
+var URC_PLAINTEXT = uint32(0)
+var URC_DHT_KAD = binary.BigEndian.Uint32([]byte{0x01, 0x01 , 0x01, 0x01}[:])
+
+
 
 
 type MessageReader interface {

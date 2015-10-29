@@ -11,6 +11,7 @@ package arc
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
@@ -72,6 +73,8 @@ import (
   "net"
   "time"
 )
+
+
 
 type etherHub struct {
   fd C.int

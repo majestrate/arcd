@@ -3,7 +3,6 @@ package main
 import (
   "github.com/majestrate/arcd/arc"
   "os"
-  "time"
 )
 
 func main() {
@@ -14,36 +13,35 @@ func main() {
   
   cfg := arc.LoadConfig(fname)
 
-  router := arc.NewBroadcastRouter(cfg.Local.Keys)
+  router := arc.NewKadRouter(cfg.Local.Keys)
 
-  var eth arc.Hub
+  var hubs []arc.Hub
   
   if len(cfg.Local.EtherBind) > 0 {
-    eth = arc.CreateEthernetHub(cfg.Local.EtherBind, router)
+    eth := arc.CreateEthernetHub(cfg.Local.EtherBind, router)
+    hubs = append(hubs, eth)
   }
 
-  irc := arc.NewIRCHub(router)
-  go irc.Run()
-  for _, remote := range cfg.IRC {
-    go irc.Persist(remote)
+  if cfg.IRC == nil {
+    // no irc
+  } else {
+    irc := arc.NewIRCHub(router)
+    go irc.Run()
+    for _, remote := range cfg.IRC {
+      go irc.Persist(remote)
+    }
+    hubs = append(hubs, irc)
   }
   
   hub := arc.CreateHub(cfg.Local.Bind, cfg.Local.Keys, router)
   for _, remote := range cfg.URC {
     go hub.Persist(remote)
   }
-  go hub.Run()
-  if eth == nil {
-    go router.Run(hub, irc)
-  } else {
-    go eth.Run()
-    go router.Run(hub, eth, irc)
-  }
+  hubs = append(hubs, hub)
 
-  chnl := router.InboundChan()
-  for {
-    m := arc.Privmsg("arcd", "#status", "keep alive")
-    chnl <- m
-    time.Sleep(10 * time.Second)
+  for idx, _ := range hubs {
+    go hubs[idx].Run()
   }
+  
+  router.Run(hubs...)
 }
