@@ -184,7 +184,7 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
             // don't forward it
             break
           } else {
-            irc.Line("%s", line)
+            irc.Line(":%s PRIVMSG %s %s", nick, target, param)
           }
         } else {
           // not tracked
