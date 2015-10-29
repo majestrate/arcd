@@ -138,6 +138,7 @@ func (irc *ircBridge) produce(chnl chan Message) (err error) {
 func (irc *ircBridge) consume(chnl chan ircLine) {
   for {
     line, ok := <- chnl
+    log.Println("irchub consume", line)
     if ok {
       target := line.Target()
       nick := extractNick(target)
@@ -217,7 +218,7 @@ func (info ircAuthInfo) Pass() string {
 // write a line
 func (irc ircBridge) Line(format string, args ...interface{}) (err error) {
   _, err = fmt.Fprintf(irc, format, args...)
-  log.Println("hub2server", fmt.Sprintf(format, args...))
+  log.Println("irchub hub2server", fmt.Sprintf(format, args...))
   _, err = io.WriteString(irc, "\n")
   return
 }
