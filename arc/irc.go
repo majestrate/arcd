@@ -143,6 +143,7 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
       target := line.Target()
       nick := extractNick(target)
       cmd := line.Command()
+      param := line.Param()
       switch cmd {
       case "NICK":
         local, ok := irc.nicks[nick]
@@ -192,7 +193,7 @@ func (irc *ircBridge) consume(chnl chan ircLine) {
           irc.Line(":%s USER user arcd arcd :remote user", nick)
           irc.Line(":%s MODE +i %s", nick, nick)
           irc.Line(":%s JOIN %s", nick, target)
-          irc.Line("%s", line)
+          irc.Line(":%s PRIVMSG %s :%s", nick, target, param)
         }
         break
       }
