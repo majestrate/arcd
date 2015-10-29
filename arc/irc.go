@@ -248,7 +248,7 @@ func (h ircHub) Send(m Message) {
 
 
 func (h *ircHub) runConnection(c io.ReadWriteCloser, auth ircAuthInfo) (err error) {
-  chnl := make(chan ircLine)
+  chnl := make(chan ircLine, 128)
   irc := ircBridge{c, auth.Name(), "archub", make(map[string]int64),make(map[string]ircChannel), make(map[string]bool)}
   err = irc.handshake(auth)
   if err == nil {
