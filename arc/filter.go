@@ -15,7 +15,6 @@ type bloomFilter [1024*32]byte
 func (f *bloomFilter) getProbes(data []byte) []uint64 {
   h := sha256.Sum256(data)
   return []uint64{
-    binary.LittleEndian.Uint64(h[:16]),
     binary.LittleEndian.Uint64(h[16:32]),
   }
 }
